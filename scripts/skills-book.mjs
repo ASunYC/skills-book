@@ -10,6 +10,7 @@ import { execSync } from "child_process";
 
 const CACHE_DIR = join(homedir(), ".claude", "skills-book", "cache");
 const CACHE_FILE = join(CACHE_DIR, "skills-index.json");
+const MANUAL_SKILLS_FILE = join(CACHE_DIR, "manual-skills.json");
 const SKILLS_INSTALL_DIR = join(homedir(), ".claude", "skills");
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const STARS_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -58,24 +59,83 @@ function writeCache(data) {
   writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
+function readManualSkills() {
+  if (!existsSync(MANUAL_SKILLS_FILE)) return {};
+  try {
+    return JSON.parse(readFileSync(MANUAL_SKILLS_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeManualSkills(skills) {
+  ensureCacheDir();
+  writeFileSync(MANUAL_SKILLS_FILE, JSON.stringify(skills, null, 2), "utf8");
+}
+
+const GH_PROXY = "https://gh-proxy.org";
+const GH_API_TEST = "https://api.github.com/rate_limit";
+
+// Session-level: detect once whether direct GitHub access works
+let _ghAccessible = null;
+
+async function isGitHubAccessible() {
+  if (_ghAccessible !== null) return _ghAccessible;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(GH_API_TEST, { signal: controller.signal });
+    clearTimeout(timer);
+    _ghAccessible = res.ok;
+  } catch {
+    _ghAccessible = false;
+  }
+  return _ghAccessible;
+}
+
+// If direct access fails, wrap URL with proxy
+function maybeProxyUrl(url) {
+  if (url.startsWith("https://api.github.com/") || url.startsWith("https://raw.githubusercontent.com/")) {
+    return `${GH_PROXY}/${url}`;
+  }
+  return url;
+}
+
 async function fetchWithRetry(url, retries = 3) {
+  const directOk = await isGitHubAccessible();
+  const isGitHubUrl = url.startsWith("https://api.github.com/") || url.startsWith("https://raw.githubusercontent.com/");
+
+  // If GitHub is accessible, go direct
+  if (directOk || !isGitHubUrl) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const headers = {};
+        const token = process.env.GITHUB_TOKEN;
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (res.status === 403) {
+          const remaining = res.headers.get("x-ratelimit-remaining");
+          if (remaining === "0") throw new Error("rate_limited");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+      } catch (e) {
+        if (e.message === "rate_limited") throw e;
+        if (i === retries - 1) throw e;
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** i));
+      }
+    }
+  }
+
+  // Direct failed, try proxy
+  const proxiedUrl = maybeProxyUrl(url);
   for (let i = 0; i < retries; i++) {
     try {
-      const headers = {};
-      const token = process.env.GITHUB_TOKEN;
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(url, { headers });
-      if (res.status === 403) {
-        const remaining = res.headers.get("x-ratelimit-remaining");
-        if (remaining === "0") {
-          throw new Error("rate_limited");
-        }
-      }
+      const res = await fetch(proxiedUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res;
     } catch (e) {
-      if (e.message === "rate_limited") throw e;
       if (i === retries - 1) throw e;
       await new Promise((r) => setTimeout(r, 1000 * 2 ** i));
     }
@@ -467,6 +527,12 @@ async function cmdFetch(args) {
     }
   }
 
+  // Merge manual skills (persisted across fetches)
+  const manualSkills = readManualSkills();
+  for (const [key, skill] of Object.entries(manualSkills)) {
+    allSkills[key] = skill;
+  }
+
   const data = {
     version: 1,
     updated_at: new Date().toISOString(),
@@ -486,6 +552,13 @@ function ensureCache() {
   if (!cache || !cache.skills || Object.keys(cache.skills).length === 0) {
     log("No cache found. Running fetch first...");
     return null;
+  }
+  // Merge manual skills into cache for queries
+  const manual = readManualSkills();
+  for (const [key, skill] of Object.entries(manual)) {
+    if (!cache.skills[key]) {
+      cache.skills[key] = skill;
+    }
   }
   return cache;
 }
@@ -532,9 +605,12 @@ function cmdList(category) {
 
   log(`\nSkills in "${matched[0][1].category}" (${matched.length}):\n`);
   for (const [key, skill] of matched) {
-    const starStr = skill.stars != null ? ` ★${skill.stars.toLocaleString()}` : "";
-    log(`  ${skill.display_name.padEnd(40)} ${starStr}`);
-    log(`    ${skill.description}`);
+    const starStr = skill.stars != null ? `★${skill.stars.toLocaleString()}` : "—";
+    const urlStr = skill.github_repo ? `https://github.com/${skill.github_repo}` : skill.url || "";
+    const author = skill.owner || "";
+    const name = skill.name || skill.display_name;
+    const descWithUrl = urlStr ? `${skill.description} (${urlStr})` : skill.description;
+    log(`  ${name.padEnd(30)} ${author.padEnd(20)} ${starStr.padStart(8)}  ${descWithUrl}`);
     log("");
   }
 }
@@ -572,9 +648,12 @@ function cmdSearch(query) {
 
   log(`\nSearch results for "${query}" (${results.length}):\n`);
   for (const [key, skill] of results.slice(0, 50)) {
-    const starStr = skill.stars != null ? ` ★${skill.stars.toLocaleString()}` : "";
-    log(`  ${skill.display_name.padEnd(40)} ${starStr}`);
-    log(`    [${skill.category}] ${skill.description}`);
+    const starStr = skill.stars != null ? `★${skill.stars.toLocaleString()}` : "—";
+    const urlStr = skill.github_repo ? `https://github.com/${skill.github_repo}` : skill.url || "";
+    const author = skill.owner || "";
+    const name = skill.name || skill.display_name;
+    const descWithUrl = urlStr ? `${skill.description} (${urlStr})` : skill.description;
+    log(`  ${name.padEnd(30)} ${author.padEnd(20)} ${starStr.padStart(8)}  ${descWithUrl}`);
     log("");
   }
   if (results.length > 50) {
@@ -745,6 +824,224 @@ function cmdUninstall(name) {
   }
 }
 
+// ─── Discover Skills from GitHub ─────────────────────────────────────────────
+
+async function searchGitHubRepos(query, sort = "stars", perPage = 100) {
+  log(`  Searching repos: "${query}"...`);
+  const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=${sort}&per_page=${perPage}`;
+  const res = await fetchWithRetry(url);
+  return (await res.json()).items || [];
+}
+
+async function searchGitHubCode(query, perPage = 100) {
+  log(`  Searching code: "${query}"...`);
+  const url = `https://api.github.com/search/code?q=${encodeURIComponent(query)}&per_page=${perPage}`;
+  try {
+    const res = await fetchWithRetry(url);
+    return (await res.json()).items || [];
+  } catch {
+    // Code search often returns errors without token, skip gracefully
+    return [];
+  }
+}
+
+async function cmdDiscover(args) {
+  log("Discovering skills from GitHub...\n");
+
+  const cache = readCache() || { skills: {} };
+  const manual = readManualSkills();
+
+  // Merge existing into one set for dedup
+  const existing = new Set();
+  for (const key of Object.keys(cache.skills || {})) existing.add(key);
+  for (const key of Object.keys(manual)) existing.add(key);
+
+  const newSkills = {};
+
+  // ── 1. Search by topics ──
+  log("1. Searching by topics...");
+  const topicQueries = [
+    "topic:agent-skill",
+    "topic:claude-code",
+    "topic:ai-skill",
+    "topic:agent-tool",
+    "topic:ai-agent-tool",
+  ];
+
+  for (const q of topicQueries) {
+    try {
+      const repos = await searchGitHubRepos(q);
+      for (const repo of repos) {
+        const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
+        if (existing.has(key) || newSkills[key]) continue;
+        newSkills[key] = {
+          owner: repo.owner.login.toLowerCase(),
+          name: repo.name.toLowerCase(),
+          display_name: `${repo.owner.login}/${repo.name}`,
+          description: repo.description || "No description",
+          url: repo.html_url,
+          github_repo: repo.full_name,
+          category: "Discovered",
+          source: "discover:topic",
+          stars: repo.stargazers_count,
+        };
+      }
+    } catch (e) {
+      logErr(`  Skipped "${q}": ${e.message}`);
+    }
+  }
+  log(`  Found ${Object.keys(newSkills).length} new from topics\n`);
+
+  // ── 2. Search for SKILL.md files ──
+  log("2. Searching for SKILL.md files...");
+  const codeQueries = [
+    "filename:SKILL.md+fork:false",
+    "filename:SKILL.md+awesome-agent",
+    "SKILL.md+claude+fork:false",
+  ];
+
+  for (const q of codeQueries) {
+    try {
+      const items = await searchGitHubCode(q);
+      for (const item of items) {
+        // item.repository is the full repo object
+        const repo = item.repository;
+        const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
+        if (existing.has(key) || newSkills[key]) continue;
+        newSkills[key] = {
+          owner: repo.owner.login.toLowerCase(),
+          name: repo.name.toLowerCase(),
+          display_name: `${repo.owner.login}/${repo.name}`,
+          description: repo.description || "No description",
+          url: repo.html_url,
+          github_repo: repo.full_name,
+          category: "Discovered",
+          source: "discover:code",
+          stars: repo.stargazers_count,
+        };
+      }
+    } catch (e) {
+      logErr(`  Skipped "${q}": ${e.message}`);
+    }
+  }
+  log(`  Found ${Object.keys(newSkills).length} total so far\n`);
+
+  // ── 3. Search by keywords ──
+  log("3. Searching by keywords...");
+  const keywordQueries = [
+    "claude agent skill",
+    "ai agent skills",
+    "awesome-agent-skills",
+    "claude-code skill",
+    "codex skill",
+    "AI coding skill",
+  ];
+
+  for (const q of keywordQueries) {
+    try {
+      const repos = await searchGitHubRepos(q);
+      for (const repo of repos) {
+        const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
+        if (existing.has(key) || newSkills[key]) continue;
+        // Filter: must have SKILL.md in repo or description mentions skill/agent
+        const hasSkillKeyword =
+          (repo.description || "").toLowerCase().includes("skill") ||
+          (repo.description || "").toLowerCase().includes("agent") ||
+          (repo.topics || []).some((t) => t.includes("skill") || t.includes("agent"));
+        if (!hasSkillKeyword) continue;
+        newSkills[key] = {
+          owner: repo.owner.login.toLowerCase(),
+          name: repo.name.toLowerCase(),
+          display_name: `${repo.owner.login}/${repo.name}`,
+          description: repo.description || "No description",
+          url: repo.html_url,
+          github_repo: repo.full_name,
+          category: "Discovered",
+          source: "discover:keyword",
+          stars: repo.stargazers_count,
+        };
+      }
+    } catch (e) {
+      logErr(`  Skipped "${q}": ${e.message}`);
+    }
+  }
+
+  // ── Merge into manual skills ──
+  if (Object.keys(newSkills).length === 0) {
+    log("\nNo new skills found.");
+    return;
+  }
+
+  log(`\nFound ${Object.keys(newSkills).length} new skills:\n`);
+  const sorted = Object.entries(newSkills).sort((a, b) => (b[1].stars || 0) - (a[1].stars || 0));
+  for (const [key, skill] of sorted.slice(0, 30)) {
+    const starStr = skill.stars ? `★${skill.stars.toLocaleString()}` : "—";
+    log(`  ${skill.display_name.padEnd(42)} ${starStr.padStart(8)}  ${skill.description}`);
+  }
+  if (sorted.length > 30) {
+    log(`  ... and ${sorted.length - 30} more`);
+  }
+
+  // Merge into manual skills for persistence
+  for (const [key, skill] of Object.entries(newSkills)) {
+    manual[key] = skill;
+  }
+  writeManualSkills(manual);
+  log(`\nAdded ${Object.keys(newSkills).length} skills to cache.`);
+}
+
+// ─── Manual Skills ───────────────────────────────────────────────────────────
+
+function cmdAdd(args) {
+  // Expected: add owner name description url [category]
+  if (args.length < 4) {
+    logErr("Usage: skills-book.mjs add <owner> <name> <description> <url> [category]");
+    logErr("Example: add alchaincyf huashu-design \"HTML design skill\" https://github.com/alchaincyf/huashu-design");
+    return;
+  }
+  const [owner, name, ...rest] = args;
+  const url = rest.pop();
+  const description = rest.join(" ");
+  const category = args[5] || "Community Skills";
+
+  const key = `${owner.toLowerCase()}/${name.toLowerCase()}`;
+  const manual = readManualSkills();
+  manual[key] = {
+    owner: owner.toLowerCase(),
+    name: name.toLowerCase(),
+    display_name: key,
+    description,
+    url,
+    github_repo: `alchaincyf/huashu-design` === key ? key : null,
+    category,
+    source: "manual",
+    stars: null,
+  };
+
+  // Auto-detect github_repo
+  const repo = extractRepoFromUrl(url);
+  if (repo) manual[key].github_repo = repo;
+
+  writeManualSkills(manual);
+  log(`Added ${key} to manual skills. It will persist across fetches.`);
+}
+
+function cmdRemove(key) {
+  if (!key) {
+    logErr("Usage: skills-book.mjs remove <owner/name>");
+    return;
+  }
+  const normalizedKey = key.toLowerCase();
+  const manual = readManualSkills();
+  if (!manual[normalizedKey]) {
+    log(`"${normalizedKey}" is not a manually added skill.`);
+    return;
+  }
+  delete manual[normalizedKey];
+  writeManualSkills(manual);
+  log(`Removed ${normalizedKey} from manual skills.`);
+}
+
 // ─── Update ──────────────────────────────────────────────────────────────────
 
 async function cmdUpdate() {
@@ -769,6 +1066,9 @@ Commands:
   info <owner/name>        Detailed info for a skill
   install <owner/name>     Install a skill to ~/.claude/skills/
   uninstall <name>         Remove a skill from ~/.claude/skills/
+  add <owner> <name> <desc> <url>  Manually add a skill (persists across fetches)
+  remove <owner/name>      Remove a manually added skill
+  discover                 Search GitHub for new skills via topics, code, and keywords
   update                   Re-fetch all skills and refresh cache
   help                     Show this help message
 
@@ -814,6 +1114,15 @@ async function main() {
       break;
     case "uninstall":
       cmdUninstall(args[1]);
+      break;
+  case "add":
+      cmdAdd(args.slice(1));
+      break;
+    case "remove":
+      cmdRemove(args[1]);
+      break;
+    case "discover":
+      await cmdDiscover(args.slice(1));
       break;
     case "update":
       await cmdUpdate();
