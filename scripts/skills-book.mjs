@@ -604,13 +604,34 @@ function cmdList(category) {
   }
 
   log(`\nSkills in "${matched[0][1].category}" (${matched.length}):\n`);
+
+  const maxName = 28;
+  const maxAuthor = 16;
+  const maxStars = 9;
+  const maxDesc = 60;
+
+  log(`  ${"─".repeat(maxName + maxAuthor + maxStars + maxDesc + 10)}`);
+  log(`  ${"名称".padEnd(maxName)} ${"作者".padEnd(maxAuthor)} ${"Stars".padStart(maxStars)}  说明`);
+  log(`  ${"─".repeat(maxName + maxAuthor + maxStars + maxDesc + 10)}`);
+
   for (const [key, skill] of matched) {
-    const starStr = skill.stars != null ? `★${skill.stars.toLocaleString()}` : "—";
+    const starStr = skill.stars != null ? `${skill.stars.toLocaleString()}` : "—";
     const urlStr = skill.github_repo ? `https://github.com/${skill.github_repo}` : skill.url || "";
     const author = skill.owner || "";
     const name = skill.name || skill.display_name;
-    const descWithUrl = urlStr ? `${skill.description} (${urlStr})` : skill.description;
-    log(`  ${name.padEnd(30)} ${author.padEnd(20)} ${starStr.padStart(8)}  ${descWithUrl}`);
+    const desc = urlStr ? `${skill.description} (${urlStr})` : skill.description;
+
+    const nameCol = name.length > maxName ? name.slice(0, maxName - 2) + ".." : name;
+    const authorCol = author.length > maxAuthor ? author.slice(0, maxAuthor - 2) + ".." : author;
+
+    for (let i = 0; i < desc.length; i += maxDesc) {
+      const chunk = desc.slice(i, i + maxDesc);
+      if (i === 0) {
+        log(`  ${nameCol.padEnd(maxName)} ${authorCol.padEnd(maxAuthor)} ${starStr.padStart(maxStars)}  ${chunk}`);
+      } else {
+        log(`  ${" ".padEnd(maxName)} ${" ".padEnd(maxAuthor)} ${" ".padStart(maxStars)}  ${chunk}`);
+      }
+    }
     log("");
   }
 }
@@ -647,13 +668,37 @@ function cmdSearch(query) {
   }
 
   log(`\nSearch results for "${query}" (${results.length}):\n`);
+
+  const maxName = 28;
+  const maxAuthor = 16;
+  const maxStars = 9;
+  const maxDesc = 60;
+
+  // Header
+  log(`  ${"─".repeat(maxName + maxAuthor + maxStars + maxDesc + 10)}`);
+  log(`  ${"名称".padEnd(maxName)} ${"作者".padEnd(maxAuthor)} ${"Stars".padStart(maxStars)}  说明`);
+  log(`  ${"─".repeat(maxName + maxAuthor + maxStars + maxDesc + 10)}`);
+
   for (const [key, skill] of results.slice(0, 50)) {
-    const starStr = skill.stars != null ? `★${skill.stars.toLocaleString()}` : "—";
+    const starStr = skill.stars != null ? `${skill.stars.toLocaleString()}` : "—";
     const urlStr = skill.github_repo ? `https://github.com/${skill.github_repo}` : skill.url || "";
     const author = skill.owner || "";
     const name = skill.name || skill.display_name;
-    const descWithUrl = urlStr ? `${skill.description} (${urlStr})` : skill.description;
-    log(`  ${name.padEnd(30)} ${author.padEnd(20)} ${starStr.padStart(8)}  ${descWithUrl}`);
+    const desc = urlStr ? `${skill.description} (${urlStr})` : skill.description;
+
+    const nameCol = name.length > maxName ? name.slice(0, maxName - 2) + ".." : name;
+    const authorCol = author.length > maxAuthor ? author.slice(0, maxAuthor - 2) + ".." : author;
+
+    // Wrap description to fit maxDesc width
+    const lineWidth = maxDesc;
+    for (let i = 0; i < desc.length; i += lineWidth) {
+      const chunk = desc.slice(i, i + lineWidth);
+      if (i === 0) {
+        log(`  ${nameCol.padEnd(maxName)} ${authorCol.padEnd(maxAuthor)} ${starStr.padStart(maxStars)}  ${chunk}`);
+      } else {
+        log(`  ${" ".padEnd(maxName)} ${" ".padEnd(maxAuthor)} ${" ".padStart(maxStars)}  ${chunk}`);
+      }
+    }
     log("");
   }
   if (results.length > 50) {
