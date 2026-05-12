@@ -1,0 +1,16 @@
+{
+  "name": "skills-book",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Aggregate, browse, install, and build a SQLite LLM Wiki for public agent skills.",
+  "scripts": {
+    "fetch": "node scripts/skills-book.mjs fetch",
+    "build-wiki": "node scripts/skills-book.mjs build-wiki",
+    "wiki-query": "node scripts/skills-book.mjs wiki-query",
+    "shop-export": "node scripts/skills-book.mjs shop-export"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.6"
+  }
+}

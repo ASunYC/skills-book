@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync
 import { join, dirname, basename } from "path";
 import { homedir } from "os";
 import { execSync } from "child_process";
+import { cmdBuildWiki, cmdShopExport, cmdWikiGraph, cmdWikiQuery } from "./wiki-commands.mjs";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1072,6 +1073,10 @@ Commands:
   remove <owner/name>      Remove a manually added skill
   discover                 Search GitHub for new skills via topics, code, and keywords
   update                   Re-fetch all skills and refresh cache
+  build-wiki [--limit N]   Build SQLite skills.db from the cached skills index
+  wiki-query <query>       Search the SQLite Skills Wiki
+  wiki-graph [--out file]  Export the Skills Wiki graph JSON
+  shop-export <dir>        Export Skills Shop static data for ASunYC.github.io
   help                     Show this help message
 
 Examples:
@@ -1083,6 +1088,9 @@ Examples:
   skills-book.mjs info "stripe/reasoning"
   skills-book.mjs install "stripe/reasoning"
   skills-book.mjs uninstall "reasoning"
+  skills-book.mjs build-wiki
+  skills-book.mjs wiki-query "frontend design"
+  skills-book.mjs shop-export ../ASunYC.github.io/docs/public/data
 `);
 }
 
@@ -1128,6 +1136,18 @@ async function main() {
       break;
     case "update":
       await cmdUpdate();
+      break;
+    case "build-wiki":
+      await cmdBuildWiki(args.slice(1));
+      break;
+    case "wiki-query":
+      await cmdWikiQuery(args.slice(1));
+      break;
+    case "wiki-graph":
+      await cmdWikiGraph(args.slice(1));
+      break;
+    case "shop-export":
+      await cmdShopExport(args.slice(1));
       break;
     case "help":
     case "--help":
