@@ -4,6 +4,21 @@
   "private": true,
   "type": "module",
   "description": "Aggregate, browse, install, and build a SQLite LLM Wiki for public agent skills.",
+  "keywords": [
+    "agent-skills",
+    "skills",
+    "skills-book",
+    "skill-marketplace",
+    "claude-code",
+    "codex",
+    "opencode",
+    "llm-wiki",
+    "knowledge-base",
+    "knowledge-graph",
+    "sqlite",
+    "github",
+    "awesome-agent-skills"
+  ],
   "scripts": {
     "cli": "node scripts/skills.mjs",
     "fetch": "node scripts/skills-book.mjs fetch",
