@@ -40,7 +40,7 @@
         {
           "name": "UI UX Pro Max",
           "type": "技能",
-          "install": "uipro init",
+          "install": "npm install -g uipro-cli\nuipro init --ai codex # Codex CLI",
           "description": "前端体验与视觉质量增强技能包，帮助 Agent 生成更有设计感、更少模板味的页面。",
           "why": "适合把可运行页面提升为更完整的产品界面，减少随意堆卡片、Emoji 或单调配色。",
           "notes": [

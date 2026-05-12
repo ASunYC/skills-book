@@ -110,7 +110,8 @@ Skills Book 内置“搭配推荐”数据源，用来收录一组可以一起�
 ```bash
 npx -y firecrawl-cli@latest init --all --browser
 npx ctx7@latest setup
-uipro init
+npm install -g uipro-cli
+uipro init --ai codex # Codex CLI
 ```
 
 ---

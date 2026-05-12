@@ -64,7 +64,15 @@ export function comboToMarkdown(combo) {
     lines.push(`### ${component.name}`);
     lines.push("");
     lines.push(`- 类型：${component.type || "工具"}`);
-    lines.push(`- 安装：\`${component.install || ""}\``);
+    if (String(component.install || "").includes("\n")) {
+      lines.push("- 安装：");
+      lines.push("");
+      lines.push("```bash");
+      lines.push(component.install || "");
+      lines.push("```");
+    } else {
+      lines.push(`- 安装：\`${component.install || ""}\``);
+    }
     lines.push(`- 作用：${component.description || ""}`);
     if (component.why) lines.push(`- 推荐理由：${component.why}`);
     for (const note of component.notes || []) lines.push(`- 注意：${note}`);
@@ -188,7 +196,9 @@ function printComboDetail(combo) {
   log("\n安装与用途:");
   for (const [index, component] of (combo.components || []).entries()) {
     log(`${index + 1}. ${component.name} (${component.type || "工具"})`);
-    log(`   安装: ${component.install || ""}`);
+    const installLines = String(component.install || "").split("\n");
+    log(`   安装: ${installLines[0] || ""}`);
+    for (const line of installLines.slice(1)) log(`         ${line}`);
     log(`   作用: ${component.description || ""}`);
     if (component.why) log(`   推荐理由: ${component.why}`);
     for (const note of component.notes || []) log(`   注意: ${note}`);
