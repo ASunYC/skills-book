@@ -8,8 +8,6 @@
 
 **创作者**: [ASunYC](https://github.com/ASunYC)
 
-[官网首页](https://asunyc.github.io/) · [Skills Book 页面](https://asunyc.github.io/skills-book/) · [Skills Shop 页面](https://asunyc.github.io/skills-shop/)
-
 [效果演示](#-效果演示) • [项目简介](#-项目简介) • [功能特性](#-功能特性) • [一键安装](#-一键安装) • [使用指南](#-使用指南) • [命令行](#-命令行) • [常见问题](#-常见问题) • [更新日志](#-更新日志)
 
 </div>
@@ -38,6 +36,12 @@ Skills Book 是一个聚合多源 awesome-agent-skills 仓库的技能管理工�
 - 🔄 **智能去重分类**，同一技能只保留一条，自动合并分类
 - ⭐ **Stars 排行榜**，按 GitHub 热度排序展示
 - 🚀 **一键安装卸载**，让 Agent 自动完成技能安装与删除
+
+### 演示地址
+
+- 官网首页：https://asunyc.github.io/
+- Skills Book 页面：https://asunyc.github.io/skills-book/
+- Skills Shop 页面：https://asunyc.github.io/skills-shop/
 
 ### 🎯 设计理念
 
