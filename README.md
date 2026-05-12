@@ -4,9 +4,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Node.js](https://img.shields.io/badge/node.js-22+-green.svg)
+<img alt="Version" src="https://img.shields.io/badge/version-0.1.0-blue.svg"> <img alt="Node.js" src="https://img.shields.io/badge/node.js-22+-green.svg"> <img alt="Zero Dependencies" src="https://img.shields.io/badge/dependencies-zero-orange.svg"> <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-green.svg">
 
 **创作者**: [ASunYC](https://github.com/ASunYC)
 
