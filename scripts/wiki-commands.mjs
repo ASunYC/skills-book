@@ -504,9 +504,21 @@ function addComboComponentRelations(db, combos) {
   }
 }
 
-function graphFromSkillsDb(db) {
+function graphFromSkillsDb(db, { maxEdges = 5000 } = {}) {
   const skills = db.prepare("SELECT id, slug, display_name, stars, category, author_login, location_id FROM skills ORDER BY stars DESC").all();
-  const edges = db.prepare("SELECT source_id AS source, target_id AS target, relation_type AS relation, weight, evidence FROM relations WHERE source_id LIKE 'skill:%' AND target_id LIKE 'skill:%'").all();
+  const totalEdges = db.prepare("SELECT COUNT(*) AS count FROM relations WHERE source_id LIKE 'skill:%' AND target_id LIKE 'skill:%'").get().count;
+  const edges = db.prepare(`
+SELECT source_id AS source, target_id AS target, relation_type AS relation, weight, evidence
+FROM relations
+WHERE source_id LIKE 'skill:%' AND target_id LIKE 'skill:%'
+ORDER BY weight DESC
+LIMIT ?
+`).all(maxEdges);
+  const degreeById = new Map();
+  for (const edge of edges) {
+    degreeById.set(edge.source, (degreeById.get(edge.source) || 0) + 1);
+    degreeById.set(edge.target, (degreeById.get(edge.target) || 0) + 1);
+  }
   return {
     nodes: skills.map((skill) => ({
       id: skill.id,
@@ -517,7 +529,7 @@ function graphFromSkillsDb(db) {
       category: skill.category,
       author: skill.author_login,
       location: skill.location_id,
-      degree: edges.filter((edge) => edge.source === skill.id || edge.target === skill.id).length,
+      degree: degreeById.get(skill.id) || 0,
     })),
     edges,
     communities: Object.entries(Object.groupBy(skills, (skill) => skill.category || "Uncategorized")).map(([category, nodes]) => ({
@@ -525,7 +537,7 @@ function graphFromSkillsDb(db) {
       label: category,
       nodeIds: nodes.map((node) => node.id),
     })),
-    statistics: { totalNodes: skills.length, totalEdges: edges.length },
+    statistics: { totalNodes: skills.length, totalEdges, exportedEdges: edges.length, edgeLimit: maxEdges },
   };
 }
 
@@ -662,6 +674,7 @@ export async function cmdWikiGraph(args = []) {
 export async function cmdShopExport(args = []) {
   const outDir = args.find((arg, index) => !arg.startsWith("--") && args[index - 1] !== "--db") || option(args, "--out", null);
   if (!outDir) throw new Error("Usage: skills-book.mjs shop-export <output-dir> [--db path]");
+  const graphEdgeLimit = Number(option(args, "--graph-edge-limit", "5000"));
   const db = await openDb(await resolveDbPath(args, { save: false }));
   const dataRoot = resolve(outDir);
   const skillDir = join(dataRoot, "skills-shop", "skills");
@@ -755,7 +768,7 @@ ORDER BY s.stars DESC
   };
   mkdirSync(dataRoot, { recursive: true });
   writeFileSync(join(dataRoot, "skills-shop-map.json"), JSON.stringify(mapPayload, null, 2), "utf8");
-  writeFileSync(join(dataRoot, "skills-shop", "graph.json"), JSON.stringify(graphFromSkillsDb(db), null, 2), "utf8");
+  writeFileSync(join(dataRoot, "skills-shop", "graph.json"), JSON.stringify(graphFromSkillsDb(db, { maxEdges: graphEdgeLimit }), null, 2), "utf8");
   const combosPayload = comboExportPayload();
   writeFileSync(join(dataRoot, "skills-shop-combos.json"), JSON.stringify(combosPayload, null, 2), "utf8");
   writeFileSync(join(dataRoot, "skills-shop", "combos.json"), JSON.stringify(combosPayload, null, 2), "utf8");
