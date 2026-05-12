@@ -56,6 +56,21 @@ const LOCATION_COORDS = [
   ["brazil", -14.235, -51.9253],
 ];
 
+const VIRTUAL_MARKET_LOCATIONS = [
+  { id: "virtual-san-francisco", label: "Global Skill Market / San Francisco", lat: 37.7749, lon: -122.4194 },
+  { id: "virtual-new-york", label: "Global Skill Market / New York", lat: 40.7128, lon: -74.006 },
+  { id: "virtual-london", label: "Global Skill Market / London", lat: 51.5072, lon: -0.1276 },
+  { id: "virtual-berlin", label: "Global Skill Market / Berlin", lat: 52.52, lon: 13.405 },
+  { id: "virtual-singapore", label: "Global Skill Market / Singapore", lat: 1.3521, lon: 103.8198 },
+  { id: "virtual-tokyo", label: "Global Skill Market / Tokyo", lat: 35.6762, lon: 139.6503 },
+  { id: "virtual-sydney", label: "Global Skill Market / Sydney", lat: -33.8688, lon: 151.2093 },
+  { id: "virtual-sao-paulo", label: "Global Skill Market / Sao Paulo", lat: -23.5558, lon: -46.6396 },
+  { id: "virtual-toronto", label: "Global Skill Market / Toronto", lat: 43.6532, lon: -79.3832 },
+  { id: "virtual-paris", label: "Global Skill Market / Paris", lat: 48.8566, lon: 2.3522 },
+  { id: "virtual-bengaluru", label: "Global Skill Market / Bengaluru", lat: 12.9716, lon: 77.5946 },
+  { id: "virtual-shanghai", label: "Global Skill Market / Shanghai", lat: 31.2304, lon: 121.4737 },
+];
+
 function log(...args) {
   process.stdout.write(`${args.join(" ")}\n`);
 }
@@ -339,7 +354,18 @@ function geocodeLocation(location) {
   if (!normalized) return null;
   const hit = LOCATION_COORDS.find(([name]) => normalized.includes(name));
   if (!hit) return null;
-  return { id: slugify(hit[0]), label: location, lat: hit[1], lon: hit[2] };
+  return { id: slugify(hit[0]), label: location, lat: hit[1], lon: hit[2], source: "github_profile" };
+}
+
+function virtualLocationForSkill(skill) {
+  const bucketInput = `${skill.category || "uncategorized"}:${skill.slug || skill.id || skill.displayName}`;
+  const bucket = parseInt(sha256(bucketInput).slice(0, 8), 16) % VIRTUAL_MARKET_LOCATIONS.length;
+  const base = VIRTUAL_MARKET_LOCATIONS[bucket];
+  return {
+    ...base,
+    source: "virtual_market",
+    label: `${base.label} / ${skill.category || "Uncategorized"}`,
+  };
 }
 
 function markdownToHtml(markdown) {
@@ -687,6 +713,7 @@ ORDER BY s.stars DESC
         label: row.location_label || row.author_location,
         lat: row.lat,
         lon: row.lon,
+        source: "github_profile",
       } : null,
       related: (relatedBySkill.get(row.id) || [])
         .map((item) => byId.get(item.id) && ({
@@ -699,28 +726,31 @@ ORDER BY s.stars DESC
         .filter(Boolean)
         .slice(0, 8),
     };
+    skill.mapLocation = skill.location || virtualLocationForSkill(skill);
     skills.push(skill);
     writeFileSync(join(skillDir, `${skill.slug}.json`), JSON.stringify(skill, null, 2), "utf8");
-    if (skill.location) {
-      const key = `${skill.location.lat.toFixed(4)},${skill.location.lon.toFixed(4)}`;
-      if (!locations.has(key)) locations.set(key, { ...skill.location, key, skills: [] });
-      locations.get(key).skills.push({
-        slug: skill.slug,
-        displayName: skill.displayName,
-        stars: skill.stars,
-        category: skill.category,
-        description: skill.description,
-      });
-    }
+    const key = `${skill.mapLocation.lat.toFixed(4)},${skill.mapLocation.lon.toFixed(4)}`;
+    if (!locations.has(key)) locations.set(key, { ...skill.mapLocation, key, skills: [] });
+    locations.get(key).skills.push({
+      slug: skill.slug,
+      displayName: skill.displayName,
+      stars: skill.stars,
+      category: skill.category,
+      description: skill.description,
+      locationSource: skill.mapLocation.source,
+    });
   }
   const mapLocations = [...locations.values()].map((location) => {
     location.skills.sort((a, b) => (b.stars || 0) - (a.stars || 0));
     return { ...location, topSkill: location.skills[0], skillCount: location.skills.length };
   }).sort((a, b) => (b.topSkill?.stars || 0) - (a.topSkill?.stars || 0));
+  const realMappedSkills = skills.filter((skill) => skill.mapLocation?.source === "github_profile").length;
   const mapPayload = {
     generatedAt: new Date().toISOString(),
     totalSkills: skills.length,
     mappedSkills: mapLocations.reduce((sum, location) => sum + location.skills.length, 0),
+    realMappedSkills,
+    virtualMappedSkills: skills.length - realMappedSkills,
     locations: mapLocations,
   };
   mkdirSync(dataRoot, { recursive: true });
