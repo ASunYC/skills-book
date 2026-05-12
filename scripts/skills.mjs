@@ -73,9 +73,10 @@ Commands:
   uninstall <name>         Uninstall a skill
   discover                 Discover new GitHub skills
   add/remove/update        Manage local skills index
-  build-wiki [--limit N]   Build skills.db
-  wiki-query <query>       Query the Skills Wiki
-  wiki-graph [--out file]  Export graph JSON
+  build-wiki [--limit N] [--db file] [--extract]
+                           Build skills.db through llm-wiki-build-skill
+  wiki-query <query>       Query via llm-wiki-build-skill
+  wiki-graph [--out file]  Export graph JSON via llm-wiki-build-skill
   shop-export <dir>        Export Skills Shop static data
 
 Examples:

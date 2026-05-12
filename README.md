@@ -76,6 +76,14 @@ node scripts/skills.mjs <command> [args]
 
 命令定义文件已内置在 `commands/skills-book.md`、`.claude/commands/skills-book.md`、`.codex/commands/skills-book.md` 和 `.opencode/commands/skills-book.md`。
 
+构建 Skills Wiki 时，Skills Book 会先检查本机是否已经安装 `llm-wiki-build-skill`。如果没有检测到，会自动安装到 Agent 技能目录，然后调用该技能完成 SQLite Wiki 初始化、文档导入、查询和图谱导出。首次执行 `build-wiki` 时会询问 `skills.db` 的存储路径；非交互环境会使用默认路径 `~/.claude/skills-book/cache/skills.db`，也可以通过 `--db` 显式指定：
+
+```bash
+/skills-book build-wiki --db ./skills.db
+/skills-book build-wiki --db ./skills.db --extract
+/skills-book wiki-query "frontend design" --db ./skills.db
+```
+
 ---
 
 ## ✨ 功能特性

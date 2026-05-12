@@ -1074,9 +1074,10 @@ Commands:
   remove <owner/name>      Remove a manually added skill
   discover                 Search GitHub for new skills via topics, code, and keywords
   update                   Re-fetch all skills and refresh cache
-  build-wiki [--limit N]   Build SQLite skills.db from the cached skills index
-  wiki-query <query>       Search the SQLite Skills Wiki
-  wiki-graph [--out file]  Export the Skills Wiki graph JSON
+  build-wiki [--limit N] [--db file] [--extract]
+                           Build SQLite skills.db through llm-wiki-build-skill
+  wiki-query <query>       Search the Skills Wiki through llm-wiki-build-skill
+  wiki-graph [--out file]  Export graph JSON through llm-wiki-build-skill
   shop-export <dir>        Export Skills Shop static data for ASunYC.github.io
   help                     Show this help message
 

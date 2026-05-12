@@ -2,21 +2,25 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 import crypto from "node:crypto";
 
 const CACHE_DIR = join(homedir(), ".claude", "skills-book", "cache");
 const CACHE_FILE = join(CACHE_DIR, "skills-index.json");
+const CONFIG_FILE = join(CACHE_DIR, "config.json");
 const DEFAULT_DB_FILE = join(CACHE_DIR, "skills.db");
-const DEFAULT_WIKI_ID = "skills-book";
+const DEFAULT_WIKI_ID = "default";
+const DOCS_DIR = join(CACHE_DIR, "wiki-docs");
 const GH_PROXY = "https://gh-proxy.org";
-const CHUNK_SIZE = 6000;
-const CHUNK_OVERLAP = 500;
 const FETCH_TIMEOUT_MS = 8000;
+const LLM_WIKI_REPO = "https://github.com/ASunYC/llm-wiki-build-skill.git";
+const LLM_WIKI_SKILL_NAME = "llm-wiki-build-skill";
 
 const LOCATION_COORDS = [
   ["san francisco", 37.7749, -122.4194],
@@ -52,11 +56,7 @@ const LOCATION_COORDS = [
 ];
 
 function log(...args) {
-  process.stdout.write(args.join(" ") + "\n");
-}
-
-function warn(...args) {
-  process.stderr.write(args.join(" ") + "\n");
+  process.stdout.write(`${args.join(" ")}\n`);
 }
 
 function option(args, name, fallback = null) {
@@ -66,6 +66,128 @@ function option(args, name, fallback = null) {
 
 function hasFlag(args, name) {
   return args.includes(name);
+}
+
+function ensureCacheDir() {
+  mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+function readCache() {
+  if (!existsSync(CACHE_FILE)) return null;
+  return JSON.parse(readFileSync(CACHE_FILE, "utf8"));
+}
+
+function readConfig() {
+  if (!existsSync(CONFIG_FILE)) return {};
+  try {
+    return JSON.parse(readFileSync(CONFIG_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeConfig(config) {
+  ensureCacheDir();
+  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf8");
+}
+
+async function resolveDbPath(args, { save = true } = {}) {
+  const explicit = option(args, "--db", null);
+  if (explicit) {
+    const dbPath = resolve(explicit);
+    if (save) writeConfig({ ...readConfig(), skillsDbPath: dbPath });
+    return dbPath;
+  }
+  const config = readConfig();
+  if (config.skillsDbPath) return config.skillsDbPath;
+  const envPath = process.env.SKILLS_BOOK_DB;
+  if (envPath) {
+    const dbPath = resolve(envPath);
+    if (save) writeConfig({ ...config, skillsDbPath: dbPath });
+    return dbPath;
+  }
+  const defaultPath = DEFAULT_DB_FILE;
+  let dbPath = defaultPath;
+  if (process.stdin.isTTY && process.stdout.isTTY) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await rl.question(`首次构建 Skills Wiki，请输入 skills.db 存储路径（默认 ${defaultPath}）：`);
+    rl.close();
+    if (answer.trim()) dbPath = resolve(answer.trim());
+  } else {
+    log(`首次构建 Skills Wiki，使用默认数据库路径：${defaultPath}`);
+  }
+  if (save) writeConfig({ ...config, skillsDbPath: dbPath });
+  return dbPath;
+}
+
+function resolveLlmWikiSkill() {
+  for (const candidate of llmWikiCandidates()) {
+    if (isLlmWikiSkill(candidate)) return candidate;
+  }
+  return installLlmWikiSkill();
+}
+
+function llmWikiCandidates() {
+  return [
+    process.env.SKILLS_BOOK_LLM_WIKI_PATH,
+    join(homedir(), ".claude", "skills", LLM_WIKI_SKILL_NAME),
+    join(homedir(), ".codex", "skills", LLM_WIKI_SKILL_NAME),
+    join(homedir(), ".opencode", "skills", LLM_WIKI_SKILL_NAME),
+    resolve(process.cwd(), "..", LLM_WIKI_SKILL_NAME),
+    resolve(process.cwd(), LLM_WIKI_SKILL_NAME),
+  ].filter(Boolean);
+}
+
+function isLlmWikiSkill(dir) {
+  return existsSync(join(dir, "SKILL.md")) && existsSync(join(dir, "scripts", "llm-wiki.mjs"));
+}
+
+function installLlmWikiSkill() {
+  const root = chooseAgentSkillRoot();
+  const target = join(root, LLM_WIKI_SKILL_NAME);
+  if (existsSync(target) && !isLlmWikiSkill(target)) {
+    throw new Error(`llm-wiki-build-skill install target already exists but is not valid: ${target}`);
+  }
+  if (!existsSync(target)) {
+    mkdirSync(root, { recursive: true });
+    log(`未检测到 llm-wiki-build-skill，正在安装到 Agent 技能目录：${target}`);
+    run("git", ["clone", "--depth", "1", LLM_WIKI_REPO, target], { cwd: root });
+  }
+  if (!existsSync(join(target, "node_modules", "better-sqlite3"))) {
+    log("正在安装 llm-wiki-build-skill 依赖...");
+    run("npm", ["install"], { cwd: target });
+  }
+  return target;
+}
+
+function chooseAgentSkillRoot() {
+  const roots = [
+    process.env.CLAUDE_SKILLS_DIR,
+    process.env.CODEX_SKILLS_DIR,
+    process.env.OPENCODE_SKILLS_DIR,
+    join(homedir(), ".claude", "skills"),
+    join(homedir(), ".codex", "skills"),
+    join(homedir(), ".opencode", "skills"),
+  ].filter(Boolean);
+  return roots.find((root) => existsSync(root)) || join(homedir(), ".claude", "skills");
+}
+
+function run(command, args, { cwd = process.cwd(), stdio = "inherit" } = {}) {
+  const result = spawnSync(command, args, {
+    cwd,
+    env: process.env,
+    stdio,
+    shell: process.platform === "win32" && ["git", "npm"].includes(command),
+  });
+  if (result.status !== 0) {
+    throw new Error(`Command failed: ${command} ${args.join(" ")}`);
+  }
+  return result;
+}
+
+function runLlmWiki(skillDir, args, options = {}) {
+  const script = join(skillDir, "scripts", "llm-wiki.mjs");
+  run(process.execPath, [script, ...args], options);
 }
 
 async function loadDatabase() {
@@ -78,168 +200,12 @@ async function loadDatabase() {
 }
 
 async function openDb(dbPath) {
-  mkdirSync(dirname(resolve(dbPath)), { recursive: true });
+  if (!existsSync(dbPath)) throw new Error(`Skills Wiki database not found: ${dbPath}. Run build-wiki first.`);
   const Database = await loadDatabase();
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  initSchema(db);
-  ensureWiki(db);
   return db;
-}
-
-function initSchema(db) {
-  db.exec(`
-CREATE TABLE IF NOT EXISTS wikis (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS sources (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  source_path TEXT NOT NULL,
-  source_type TEXT NOT NULL,
-  content_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS pages (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  source_id TEXT,
-  title TEXT NOT NULL,
-  path TEXT NOT NULL,
-  page_type TEXT NOT NULL,
-  content TEXT NOT NULL,
-  tags TEXT NOT NULL DEFAULT '[]',
-  word_count INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS chunks (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  source_id TEXT NOT NULL,
-  page_id TEXT NOT NULL,
-  chunk_index INTEGER NOT NULL,
-  heading TEXT,
-  text TEXT NOT NULL,
-  start_offset INTEGER NOT NULL DEFAULT 0,
-  end_offset INTEGER NOT NULL DEFAULT 0,
-  hash TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS entities (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  entity_type TEXT NOT NULL DEFAULT 'entity',
-  source_id TEXT,
-  page_id TEXT,
-  confidence REAL NOT NULL DEFAULT 0.5
-);
-CREATE TABLE IF NOT EXISTS topics (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  source_id TEXT,
-  page_id TEXT,
-  weight REAL NOT NULL DEFAULT 0.5
-);
-CREATE TABLE IF NOT EXISTS relations (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  source_id TEXT NOT NULL,
-  target_id TEXT NOT NULL,
-  relation_type TEXT NOT NULL,
-  weight REAL NOT NULL DEFAULT 0.5,
-  evidence TEXT,
-  created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS repositories (
-  full_name TEXT PRIMARY KEY,
-  owner TEXT NOT NULL,
-  name TEXT NOT NULL,
-  html_url TEXT,
-  stars INTEGER NOT NULL DEFAULT 0,
-  readme TEXT,
-  skill_md TEXT,
-  updated_at TEXT
-);
-CREATE TABLE IF NOT EXISTS authors (
-  login TEXT PRIMARY KEY,
-  name TEXT,
-  avatar_url TEXT,
-  html_url TEXT,
-  location TEXT,
-  lat REAL,
-  lon REAL,
-  updated_at TEXT
-);
-CREATE TABLE IF NOT EXISTS locations (
-  id TEXT PRIMARY KEY,
-  label TEXT NOT NULL,
-  lat REAL NOT NULL,
-  lon REAL NOT NULL
-);
-CREATE TABLE IF NOT EXISTS skills (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  owner TEXT NOT NULL,
-  name TEXT NOT NULL,
-  display_name TEXT NOT NULL,
-  slug TEXT NOT NULL,
-  description TEXT,
-  url TEXT,
-  github_repo TEXT,
-  category TEXT,
-  source TEXT,
-  stars INTEGER NOT NULL DEFAULT 0,
-  author_login TEXT,
-  location_id TEXT,
-  readme TEXT,
-  readme_html TEXT,
-  skill_md TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS import_jobs (
-  id TEXT PRIMARY KEY,
-  wiki_id TEXT NOT NULL,
-  source_path TEXT NOT NULL,
-  status TEXT NOT NULL,
-  message TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_pages_type ON pages(wiki_id, page_type);
-CREATE INDEX IF NOT EXISTS idx_pages_title ON pages(wiki_id, title);
-CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(wiki_id, source_id);
-CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(wiki_id, name);
-CREATE INDEX IF NOT EXISTS idx_topics_name ON topics(wiki_id, name);
-CREATE INDEX IF NOT EXISTS idx_relations_pair ON relations(wiki_id, source_id, target_id);
-CREATE INDEX IF NOT EXISTS idx_skills_display ON skills(display_name);
-CREATE INDEX IF NOT EXISTS idx_skills_repo ON skills(github_repo);
-CREATE INDEX IF NOT EXISTS idx_skills_stars ON skills(stars DESC);
-CREATE INDEX IF NOT EXISTS idx_locations_coords ON locations(lat, lon);
-`);
-}
-
-function ensureWiki(db) {
-  const now = new Date().toISOString();
-  db.prepare(`
-INSERT INTO wikis(id, name, description, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at
-`).run(DEFAULT_WIKI_ID, "Skills Book Wiki", "SQLite LLM Wiki built from public agent skills.", now, now);
-}
-
-function readCache() {
-  if (!existsSync(CACHE_FILE)) return null;
-  return JSON.parse(readFileSync(CACHE_FILE, "utf8"));
 }
 
 function sha256(value) {
@@ -256,93 +222,6 @@ function slugify(value) {
 
 function skillSlug(skill) {
   return slugify(`${skill.owner || "unknown"}-${skill.name || skill.display_name}`);
-}
-
-function extractTags(text) {
-  const tags = new Set();
-  const keywords = [
-    "agent", "llm", "frontend", "design", "python", "typescript", "javascript",
-    "database", "testing", "security", "docker", "api", "github", "codex", "claude",
-  ];
-  const lower = String(text || "").toLowerCase();
-  for (const keyword of keywords) if (lower.includes(keyword)) tags.add(keyword);
-  for (const match of String(text || "").matchAll(/(?:^|\s)#([A-Za-z][A-Za-z0-9_-]{2,})/g)) tags.add(match[1].toLowerCase());
-  return [...tags].slice(0, 14);
-}
-
-function chunkMarkdown(text, maxChunkSize = CHUNK_SIZE) {
-  if (!text) return [""];
-  const headingRe = /^(#{1,4})\s+(.+)$/gm;
-  const headings = [];
-  let match;
-  while ((match = headingRe.exec(text)) !== null) {
-    headings.push({ level: match[1].length, title: match[2], index: match.index, length: match[0].length });
-  }
-  if (!headings.length) return chunkText(text, maxChunkSize);
-  const chunks = [];
-  let current = "";
-  for (let i = 0; i < headings.length; i++) {
-    const currentHeading = headings[i];
-    const nextHeading = headings[i + 1];
-    const start = currentHeading.index;
-    const end = nextHeading ? nextHeading.index : text.length;
-    const section = text.slice(start, end).trim();
-    if (!section) continue;
-    if (current.length + section.length + 2 <= maxChunkSize) {
-      current = current ? `${current}\n\n${section}` : section;
-    } else {
-      if (current) chunks.push(current);
-      current = section.length > maxChunkSize ? "" : section;
-      if (section.length > maxChunkSize) chunks.push(...chunkText(section, maxChunkSize));
-    }
-  }
-  if (current) chunks.push(current);
-  return chunks.length ? chunks : chunkText(text, maxChunkSize);
-}
-
-function chunkText(text, maxChunkSize = CHUNK_SIZE) {
-  if (text.length <= maxChunkSize) return [text];
-  const chunks = [];
-  for (let start = 0; start < text.length;) {
-    const end = Math.min(text.length, start + maxChunkSize);
-    chunks.push(text.slice(start, end));
-    if (end === text.length) break;
-    start += maxChunkSize - CHUNK_OVERLAP;
-  }
-  return chunks;
-}
-
-function countWords(text) {
-  const latin = (text.match(/[A-Za-z0-9_]+/g) || []).length;
-  const cjk = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-  return latin + cjk;
-}
-
-function ingestSource(db, { title, sourcePath, sourceType = "markdown", content, pageType = "source", tags = [] }) {
-  const now = new Date().toISOString();
-  const sourceId = `src:${sha256(`${DEFAULT_WIKI_ID}:${sourcePath}`).slice(0, 24)}`;
-  const pageId = `page:${sha256(`${DEFAULT_WIKI_ID}:${sourcePath}:${title}`).slice(0, 24)}`;
-  const mergedTags = [...new Set([...tags, ...extractTags(content)])];
-  db.prepare(`
-INSERT INTO sources(id, wiki_id, title, source_path, source_type, content_hash, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET title=excluded.title, content_hash=excluded.content_hash, updated_at=excluded.updated_at
-`).run(sourceId, DEFAULT_WIKI_ID, title, sourcePath, sourceType, sha256(content), now, now);
-  db.prepare(`
-INSERT INTO pages(id, wiki_id, source_id, title, path, page_type, content, tags, word_count, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET title=excluded.title, content=excluded.content, tags=excluded.tags, word_count=excluded.word_count, updated_at=excluded.updated_at
-`).run(pageId, DEFAULT_WIKI_ID, sourceId, title, sourcePath, pageType, content, JSON.stringify(mergedTags), countWords(content), now, now);
-  db.prepare("DELETE FROM chunks WHERE wiki_id = ? AND source_id = ?").run(DEFAULT_WIKI_ID, sourceId);
-  const insertChunk = db.prepare(`
-INSERT INTO chunks(id, wiki_id, source_id, page_id, chunk_index, heading, text, start_offset, end_offset, hash)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
-  chunkMarkdown(content).forEach((chunk, index) => {
-    const heading = chunk.match(/^#{1,4}\s+(.+)$/m)?.[1] || "";
-    insertChunk.run(`chunk:${sha256(`${pageId}:${index}:${chunk}`).slice(0, 24)}`, DEFAULT_WIKI_ID, sourceId, pageId, index, heading, chunk, 0, chunk.length, sha256(chunk));
-  });
-  return { sourceId, pageId };
 }
 
 async function fetchJson(url) {
@@ -462,23 +341,6 @@ function geocodeLocation(location) {
   return { id: slugify(hit[0]), label: location, lat: hit[1], lon: hit[2] };
 }
 
-function writeAuthor(db, author) {
-  const coords = geocodeLocation(author.location);
-  if (coords) {
-    db.prepare(`
-INSERT INTO locations(id, label, lat, lon)
-VALUES (?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET label=excluded.label, lat=excluded.lat, lon=excluded.lon
-`).run(coords.id, coords.label, coords.lat, coords.lon);
-  }
-  db.prepare(`
-INSERT INTO authors(login, name, avatar_url, html_url, location, lat, lon, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(login) DO UPDATE SET name=excluded.name, avatar_url=excluded.avatar_url, html_url=excluded.html_url, location=excluded.location, lat=excluded.lat, lon=excluded.lon, updated_at=excluded.updated_at
-`).run(author.login, author.name, author.avatar_url, author.html_url, author.location, coords?.lat ?? null, coords?.lon ?? null, new Date().toISOString());
-  return coords?.id ?? null;
-}
-
 function markdownToHtml(markdown) {
   const escaped = String(markdown || "")
     .replace(/&/g, "&amp;")
@@ -535,19 +397,54 @@ function inlineMarkdown(value) {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
 }
 
+function writeSkillDocs(root, skill, docs) {
+  const slug = skillSlug(skill);
+  const dir = join(root, slug);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "README.md"), docs.readme || fallbackReadme(skill), "utf8");
+  if (docs.skillMd) writeFileSync(join(dir, "SKILL.md"), docs.skillMd, "utf8");
+}
+
+function resetDocsDir() {
+  const resolved = resolve(DOCS_DIR);
+  const cacheRoot = resolve(CACHE_DIR);
+  if (!resolved.startsWith(cacheRoot)) throw new Error(`Refusing to clear docs outside cache: ${resolved}`);
+  rmSync(resolved, { recursive: true, force: true });
+  mkdirSync(resolved, { recursive: true });
+  return resolved;
+}
+
+function writeAuthor(db, author) {
+  const coords = geocodeLocation(author.location);
+  if (coords) {
+    db.prepare(`
+INSERT INTO locations(id, label, lat, lon)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET label=excluded.label, lat=excluded.lat, lon=excluded.lon
+`).run(coords.id, coords.label, coords.lat, coords.lon);
+  }
+  db.prepare(`
+INSERT INTO authors(login, name, avatar_url, html_url, location, lat, lon, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(login) DO UPDATE SET name=excluded.name, avatar_url=excluded.avatar_url, html_url=excluded.html_url, location=excluded.location, lat=excluded.lat, lon=excluded.lon, updated_at=excluded.updated_at
+`).run(author.login, author.name, author.avatar_url, author.html_url, author.location, coords?.lat ?? null, coords?.lon ?? null, new Date().toISOString());
+  return coords?.id ?? null;
+}
+
 function upsertRelation(db, sourceId, targetId, relationType, weight, evidence) {
   if (!sourceId || !targetId || sourceId === targetId) return;
   const id = `rel:${sha256(`${sourceId}:${targetId}:${relationType}:${evidence}`).slice(0, 24)}`;
+  const now = new Date().toISOString();
   db.prepare(`
-INSERT INTO relations(id, wiki_id, source_id, target_id, relation_type, weight, evidence, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET weight=excluded.weight, evidence=excluded.evidence
-`).run(id, DEFAULT_WIKI_ID, sourceId, targetId, relationType, weight, evidence, new Date().toISOString());
+INSERT INTO relations(id, wiki_id, source_id, target_id, relation_type, weight, evidence, confidence, evidence_details, properties, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET weight=excluded.weight, evidence=excluded.evidence, updated_at=excluded.updated_at
+`).run(id, DEFAULT_WIKI_ID, sourceId, targetId, relationType, weight, evidence, "INFERRED", "[]", "{}", now, now);
 }
 
 function rebuildRelations(db) {
-  db.prepare("DELETE FROM relations WHERE wiki_id = ?").run(DEFAULT_WIKI_ID);
-  const skills = db.prepare("SELECT id, display_name, category, author_login, github_repo, location_id FROM skills WHERE wiki_id = ?").all(DEFAULT_WIKI_ID);
+  db.prepare("DELETE FROM relations WHERE wiki_id = ? AND source_id LIKE 'skill:%' AND target_id LIKE 'skill:%'").run(DEFAULT_WIKI_ID);
+  const skills = db.prepare("SELECT id, category, author_login, github_repo, location_id FROM skills WHERE wiki_id = ?").all(DEFAULT_WIKI_ID);
   for (let i = 0; i < skills.length; i++) {
     for (let j = i + 1; j < skills.length; j++) {
       const a = skills[i];
@@ -560,123 +457,9 @@ function rebuildRelations(db) {
   }
 }
 
-export async function cmdBuildWiki(args = []) {
-  const cache = readCache();
-  if (!cache?.skills) throw new Error("No skills cache found. Run `node scripts/skills-book.mjs fetch --force` first.");
-  const dbPath = option(args, "--db", DEFAULT_DB_FILE);
-  const limit = Number(option(args, "--limit", "0"));
-  const skipNetwork = hasFlag(args, "--skip-network");
-  const db = await openDb(dbPath);
-  const skills = Object.values(cache.skills)
-    .sort((a, b) => (b.stars || 0) - (a.stars || 0))
-    .slice(0, limit > 0 ? limit : undefined);
-  log(`Building Skills Wiki: ${skills.length} skills -> ${dbPath}`);
-  const insertRepo = db.prepare(`
-INSERT INTO repositories(full_name, owner, name, html_url, stars, readme, skill_md, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(full_name) DO UPDATE SET stars=excluded.stars, readme=excluded.readme, skill_md=excluded.skill_md, updated_at=excluded.updated_at
-`);
-  const insertSkill = db.prepare(`
-INSERT INTO skills(id, wiki_id, owner, name, display_name, slug, description, url, github_repo, category, source, stars, author_login, location_id, readme, readme_html, skill_md, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name, description=excluded.description, stars=excluded.stars, author_login=excluded.author_login, location_id=excluded.location_id, readme=excluded.readme, readme_html=excluded.readme_html, skill_md=excluded.skill_md, updated_at=excluded.updated_at
-`);
-  let count = 0;
-  for (const skill of skills) {
-    const slug = skillSlug(skill);
-    const skillId = `skill:${slug}`;
-    const owner = skill.owner || skill.github_repo?.split("/")[0] || "unknown";
-    const repoName = skill.github_repo?.split("/")[1] || skill.name || slug;
-    const [docs, author] = await Promise.all([
-      fetchRepoDocs(skill, skipNetwork),
-      fetchAuthor(owner, skipNetwork),
-    ]);
-    const locationId = writeAuthor(db, author);
-    const now = new Date().toISOString();
-    if (skill.github_repo) {
-      insertRepo.run(skill.github_repo, owner, repoName, `https://github.com/${skill.github_repo}`, skill.stars || 0, docs.readme, docs.skillMd, now);
-    }
-    insertSkill.run(
-      skillId,
-      DEFAULT_WIKI_ID,
-      owner,
-      skill.name || repoName,
-      skill.display_name || `${owner}/${repoName}`,
-      slug,
-      skill.description || "",
-      skill.url || (skill.github_repo ? `https://github.com/${skill.github_repo}` : ""),
-      skill.github_repo || "",
-      skill.category || "Uncategorized",
-      skill.source || "",
-      skill.stars || 0,
-      author.login,
-      locationId,
-      docs.readme,
-      markdownToHtml(docs.readme),
-      docs.skillMd,
-      now,
-      now,
-    );
-    ingestSource(db, {
-      title: `${skill.display_name || slug} README`,
-      sourcePath: `${slug}/README.md`,
-      content: docs.readme,
-      tags: [skill.category || "skill", owner],
-    });
-    if (docs.skillMd) {
-      ingestSource(db, {
-        title: `${skill.display_name || slug} SKILL`,
-        sourcePath: `${slug}/SKILL.md`,
-        content: docs.skillMd,
-        tags: [skill.category || "skill", owner],
-      });
-    }
-    count++;
-    if (count % 25 === 0) log(`  ${count}/${skills.length} skills indexed...`);
-  }
-  rebuildRelations(db);
-  const stats = {
-    skills: db.prepare("SELECT COUNT(*) AS n FROM skills").get().n,
-    pages: db.prepare("SELECT COUNT(*) AS n FROM pages").get().n,
-    chunks: db.prepare("SELECT COUNT(*) AS n FROM chunks").get().n,
-    relations: db.prepare("SELECT COUNT(*) AS n FROM relations").get().n,
-    locations: db.prepare("SELECT COUNT(*) AS n FROM locations").get().n,
-  };
-  log(`Done. skills=${stats.skills}, pages=${stats.pages}, chunks=${stats.chunks}, relations=${stats.relations}, locations=${stats.locations}`);
-}
-
-export async function cmdWikiQuery(args = []) {
-  const query = args.filter((arg) => !arg.startsWith("--") && arg !== option(args, "--db")).join(" ").trim();
-  if (!query) throw new Error("Usage: skills-book.mjs wiki-query <query> [--db path]");
-  const db = await openDb(option(args, "--db", DEFAULT_DB_FILE));
-  const like = `%${query}%`;
-  const skills = db.prepare(`
-SELECT slug, display_name, description, stars, category, github_repo
-FROM skills
-WHERE display_name LIKE ? OR description LIKE ? OR category LIKE ? OR readme LIKE ?
-ORDER BY stars DESC
-LIMIT 10
-`).all(like, like, like, like);
-  const pages = db.prepare(`
-SELECT title, path, substr(content, 1, 220) AS snippet
-FROM pages
-WHERE title LIKE ? OR content LIKE ?
-LIMIT 5
-`).all(like, like);
-  log(`\nSkills matching "${query}":\n`);
-  for (const skill of skills) {
-    log(`  ${skill.display_name.padEnd(38)} ${String(skill.stars || 0).padStart(6)}  ${skill.category}`);
-    log(`  ${skill.description}`);
-  }
-  if (pages.length) {
-    log(`\nWiki pages:\n`);
-    for (const page of pages) log(`  ${page.title} (${page.path})\n  ${page.snippet.replace(/\s+/g, " ")}...`);
-  }
-}
-
-function graphFromDb(db) {
+function graphFromSkillsDb(db) {
   const skills = db.prepare("SELECT id, slug, display_name, stars, category, author_login, location_id FROM skills ORDER BY stars DESC").all();
-  const edges = db.prepare("SELECT source_id AS source, target_id AS target, relation_type AS relation, weight, evidence FROM relations").all();
+  const edges = db.prepare("SELECT source_id AS source, target_id AS target, relation_type AS relation, weight, evidence FROM relations WHERE source_id LIKE 'skill:%' AND target_id LIKE 'skill:%'").all();
   return {
     nodes: skills.map((skill) => ({
       id: skill.id,
@@ -699,24 +482,112 @@ function graphFromDb(db) {
   };
 }
 
-export async function cmdWikiGraph(args = []) {
-  const db = await openDb(option(args, "--db", DEFAULT_DB_FILE));
-  const graph = graphFromDb(db);
-  const out = option(args, "--out", null);
-  if (out) {
-    const outPath = resolve(out);
-    mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, JSON.stringify(graph, null, 2), "utf8");
-    log(`Wrote graph: ${outPath}`);
-  } else {
-    log(JSON.stringify(graph, null, 2));
+export async function cmdBuildWiki(args = []) {
+  const cache = readCache();
+  if (!cache?.skills) throw new Error("No skills cache found. Run `node scripts/skills-book.mjs fetch --force` first.");
+  const dbPath = await resolveDbPath(args);
+  const limit = Number(option(args, "--limit", "0"));
+  const skipNetwork = hasFlag(args, "--skip-network");
+  const extract = hasFlag(args, "--extract");
+  const llmWikiDir = resolveLlmWikiSkill();
+  const docsRoot = resetDocsDir();
+  const skills = Object.values(cache.skills)
+    .sort((a, b) => (b.stars || 0) - (a.stars || 0))
+    .slice(0, limit > 0 ? limit : undefined);
+
+  log(`Building Skills Wiki through llm-wiki-build-skill: ${skills.length} skills -> ${dbPath}`);
+  runLlmWiki(llmWikiDir, ["init", dbPath, "--name", "Skills Book Wiki", "--description", "SQLite LLM Wiki built from public agent skills."]);
+
+  const records = [];
+  let count = 0;
+  for (const skill of skills) {
+    const owner = skill.owner || skill.github_repo?.split("/")[0] || "unknown";
+    const [docs, author] = await Promise.all([
+      fetchRepoDocs(skill, skipNetwork),
+      fetchAuthor(owner, skipNetwork),
+    ]);
+    writeSkillDocs(docsRoot, skill, docs);
+    records.push({ skill, docs, author });
+    count++;
+    if (count % 25 === 0) log(`  ${count}/${skills.length} skill documents prepared...`);
   }
+
+  runLlmWiki(llmWikiDir, ["ingest", dbPath, docsRoot]);
+  if (extract) runLlmWiki(llmWikiDir, ["extract", dbPath, "--depth", option(args, "--depth", "standard")]);
+
+  const db = await openDb(dbPath);
+  const insertRepo = db.prepare(`
+INSERT INTO repositories(full_name, owner, name, html_url, stars, readme, skill_md, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(full_name) DO UPDATE SET stars=excluded.stars, readme=excluded.readme, skill_md=excluded.skill_md, updated_at=excluded.updated_at
+`);
+  const insertSkill = db.prepare(`
+INSERT INTO skills(id, wiki_id, owner, name, display_name, slug, description, url, github_repo, category, source, stars, author_login, location_id, readme, skill_md, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name, description=excluded.description, stars=excluded.stars, author_login=excluded.author_login, location_id=excluded.location_id, readme=excluded.readme, skill_md=excluded.skill_md, updated_at=excluded.updated_at
+`);
+  for (const { skill, docs, author } of records) {
+    const slug = skillSlug(skill);
+    const skillId = `skill:${slug}`;
+    const owner = skill.owner || skill.github_repo?.split("/")[0] || "unknown";
+    const repoName = skill.github_repo?.split("/")[1] || skill.name || slug;
+    const locationId = writeAuthor(db, author);
+    const now = new Date().toISOString();
+    if (skill.github_repo) {
+      insertRepo.run(skill.github_repo, owner, repoName, `https://github.com/${skill.github_repo}`, skill.stars || 0, docs.readme, docs.skillMd, now);
+    }
+    insertSkill.run(
+      skillId,
+      DEFAULT_WIKI_ID,
+      owner,
+      skill.name || repoName,
+      skill.display_name || `${owner}/${repoName}`,
+      slug,
+      skill.description || "",
+      skill.url || (skill.github_repo ? `https://github.com/${skill.github_repo}` : ""),
+      skill.github_repo || "",
+      skill.category || "Uncategorized",
+      skill.source || "",
+      skill.stars || 0,
+      author.login,
+      locationId,
+      docs.readme,
+      docs.skillMd,
+      now,
+      now,
+    );
+  }
+  rebuildRelations(db);
+  const stats = {
+    skills: db.prepare("SELECT COUNT(*) AS n FROM skills").get().n,
+    pages: db.prepare("SELECT COUNT(*) AS n FROM pages").get().n,
+    chunks: db.prepare("SELECT COUNT(*) AS n FROM chunks").get().n,
+    relations: db.prepare("SELECT COUNT(*) AS n FROM relations").get().n,
+    locations: db.prepare("SELECT COUNT(*) AS n FROM locations").get().n,
+  };
+  log(`Done. skills=${stats.skills}, pages=${stats.pages}, chunks=${stats.chunks}, relations=${stats.relations}, locations=${stats.locations}`);
+}
+
+export async function cmdWikiQuery(args = []) {
+  const dbPath = await resolveDbPath(args, { save: false });
+  const query = args.filter((arg, index) => !arg.startsWith("--") && args[index - 1] !== "--db" && args[index - 1] !== "--limit").join(" ").trim();
+  if (!query) throw new Error("Usage: skills-book.mjs wiki-query <query> [--db path]");
+  const llmWikiDir = resolveLlmWikiSkill();
+  runLlmWiki(llmWikiDir, ["query", dbPath, query, "--limit", option(args, "--limit", "12")]);
+}
+
+export async function cmdWikiGraph(args = []) {
+  const dbPath = await resolveDbPath(args, { save: false });
+  const llmWikiDir = resolveLlmWikiSkill();
+  const out = option(args, "--out", null);
+  const commandArgs = out ? ["graph", dbPath, "--out", out] : ["graph", dbPath];
+  runLlmWiki(llmWikiDir, commandArgs);
 }
 
 export async function cmdShopExport(args = []) {
-  const outDir = args.find((arg) => !arg.startsWith("--")) || option(args, "--out", null);
+  const outDir = args.find((arg, index) => !arg.startsWith("--") && args[index - 1] !== "--db") || option(args, "--out", null);
   if (!outDir) throw new Error("Usage: skills-book.mjs shop-export <output-dir> [--db path]");
-  const db = await openDb(option(args, "--db", DEFAULT_DB_FILE));
+  const db = await openDb(await resolveDbPath(args, { save: false }));
   const dataRoot = resolve(outDir);
   const skillDir = join(dataRoot, "skills-shop", "skills");
   mkdirSync(skillDir, { recursive: true });
@@ -729,7 +600,7 @@ LEFT JOIN locations l ON l.id = s.location_id
 ORDER BY s.stars DESC
 `).all();
   const relatedBySkill = new Map();
-  for (const edge of db.prepare("SELECT source_id, target_id, relation_type, weight, evidence FROM relations ORDER BY weight DESC").all()) {
+  for (const edge of db.prepare("SELECT source_id, target_id, relation_type, weight, evidence FROM relations WHERE source_id LIKE 'skill:%' AND target_id LIKE 'skill:%' ORDER BY weight DESC").all()) {
     for (const [source, target] of [[edge.source_id, edge.target_id], [edge.target_id, edge.source_id]]) {
       if (!relatedBySkill.has(source)) relatedBySkill.set(source, []);
       relatedBySkill.get(source).push({ id: target, relation: edge.relation_type, weight: edge.weight, evidence: edge.evidence });
@@ -739,6 +610,7 @@ ORDER BY s.stars DESC
   const locations = new Map();
   const skills = [];
   for (const row of rows) {
+    const readme = row.readme || fallbackReadme(row);
     const skill = {
       id: row.id,
       slug: row.slug,
@@ -750,8 +622,8 @@ ORDER BY s.stars DESC
       source: row.source,
       url: row.url,
       githubRepo: row.github_repo,
-      readme: row.readme || fallbackReadme(row),
-      readmeHtml: row.readme_html || markdownToHtml(row.readme || fallbackReadme(row)),
+      readme,
+      readmeHtml: markdownToHtml(readme),
       skillMd: row.skill_md,
       updatedAt: row.updated_at,
       author: {
@@ -782,9 +654,7 @@ ORDER BY s.stars DESC
     writeFileSync(join(skillDir, `${skill.slug}.json`), JSON.stringify(skill, null, 2), "utf8");
     if (skill.location) {
       const key = `${skill.location.lat.toFixed(4)},${skill.location.lon.toFixed(4)}`;
-      if (!locations.has(key)) {
-        locations.set(key, { ...skill.location, key, skills: [] });
-      }
+      if (!locations.has(key)) locations.set(key, { ...skill.location, key, skills: [] });
       locations.get(key).skills.push({
         slug: skill.slug,
         displayName: skill.displayName,
@@ -806,7 +676,7 @@ ORDER BY s.stars DESC
   };
   mkdirSync(dataRoot, { recursive: true });
   writeFileSync(join(dataRoot, "skills-shop-map.json"), JSON.stringify(mapPayload, null, 2), "utf8");
-  writeFileSync(join(dataRoot, "skills-shop", "graph.json"), JSON.stringify(graphFromDb(db), null, 2), "utf8");
+  writeFileSync(join(dataRoot, "skills-shop", "graph.json"), JSON.stringify(graphFromSkillsDb(db), null, 2), "utf8");
   log(`Exported Skills Shop data: ${dataRoot}`);
   log(`  skills=${skills.length}, mappedLocations=${mapLocations.length}`);
 }

@@ -33,6 +33,25 @@ node path/to/skills-book/scripts/skills.mjs <command> [args]
 
 The wrapper delegates to `scripts/skills-book.mjs` and normalizes aliases such as `query` -> `wiki-query`, `graph` -> `wiki-graph`, and `refresh` -> `fetch`.
 
+## LLM Wiki Integration
+
+`build-wiki` must use `llm-wiki-build-skill` instead of embedding a separate wiki engine inside Skills Book.
+
+When running:
+
+```bash
+/skills-book build-wiki
+```
+
+Skills Book should:
+
+1. Check whether `llm-wiki-build-skill` is installed in an Agent skill directory.
+2. Install it automatically if missing.
+3. Ask for a `skills.db` storage path on first use, with `~/.claude/skills-book/cache/skills.db` as the default.
+4. Call `llm-wiki-build-skill/scripts/llm-wiki.mjs` to initialize, ingest, query, and export the LLM Wiki.
+
+Use `--db <path>` to bypass the first-use prompt, and `--extract` to run LLM extraction after ingest.
+
 ## Trigger
 
 Use this skill when the user wants to:
