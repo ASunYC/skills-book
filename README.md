@@ -8,6 +8,8 @@
 
 **创作者**: [ASunYC](https://github.com/ASunYC)
 
+[官网首页](https://asunyc.github.io/) · [Skills Book 页面](https://asunyc.github.io/skills-book/) · [Skills Shop 页面](https://asunyc.github.io/skills-shop/)
+
 [效果演示](#-效果演示) • [项目简介](#-项目简介) • [功能特性](#-功能特性) • [一键安装](#-一键安装) • [使用指南](#-使用指南) • [命令行](#-命令行) • [常见问题](#-常见问题) • [更新日志](#-更新日志)
 
 </div>
@@ -43,11 +45,6 @@ Skills Book 是一个聚合多源 awesome-agent-skills 仓库的技能管理工�
 - 纯 Node.js 22+ 原生 fetch API，无需 npm install
 - 一键执行，无需复杂配置
 - 适合 Claude Code Agent 自动调用
-
-**智能代理支持**
-- 自动检测 GitHub 连通性
-- 国内网络自动切换至 gh-proxy 代理
-- 不通就走代理，通的走直连
 
 ---
 
