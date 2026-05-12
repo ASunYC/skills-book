@@ -10,6 +10,7 @@ import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import crypto from "node:crypto";
+import { comboAsSkill, comboExportPayload, loadCombos, writeComboDocs } from "./combo-skills.mjs";
 
 const CACHE_DIR = join(homedir(), ".claude", "skills-book", "cache");
 const CACHE_FILE = join(CACHE_DIR, "skills-index.json");
@@ -457,6 +458,26 @@ function rebuildRelations(db) {
   }
 }
 
+function addComboComponentRelations(db, combos) {
+  const skills = db.prepare("SELECT id, name, display_name, slug, github_repo FROM skills WHERE wiki_id = ?").all(DEFAULT_WIKI_ID);
+  for (const combo of combos) {
+    const comboSkill = comboAsSkill(combo);
+    for (const component of combo.components || []) {
+      const componentName = String(component.name || "").toLowerCase();
+      if (!componentName) continue;
+      const hit = skills.find((skill) => [
+        skill.name,
+        skill.display_name,
+        skill.slug,
+        skill.github_repo,
+      ].some((value) => String(value || "").toLowerCase().includes(componentName)));
+      if (hit) {
+        upsertRelation(db, comboSkill.id, hit.id, "combo_component", 0.9, `${combo.title} includes ${component.name}`);
+      }
+    }
+  }
+}
+
 function graphFromSkillsDb(db) {
   const skills = db.prepare("SELECT id, slug, display_name, stars, category, author_login, location_id FROM skills ORDER BY stars DESC").all();
   const edges = db.prepare("SELECT source_id AS source, target_id AS target, relation_type AS relation, weight, evidence FROM relations WHERE source_id LIKE 'skill:%' AND target_id LIKE 'skill:%'").all();
@@ -499,6 +520,7 @@ export async function cmdBuildWiki(args = []) {
   runLlmWiki(llmWikiDir, ["init", dbPath, "--name", "Skills Book Wiki", "--description", "SQLite LLM Wiki built from public agent skills."]);
 
   const records = [];
+  const comboDocs = writeComboDocs(docsRoot);
   let count = 0;
   for (const skill of skills) {
     const owner = skill.owner || skill.github_repo?.split("/")[0] || "unknown";
@@ -516,6 +538,7 @@ export async function cmdBuildWiki(args = []) {
   if (extract) runLlmWiki(llmWikiDir, ["extract", dbPath, "--depth", option(args, "--depth", "standard")]);
 
   const db = await openDb(dbPath);
+  const comboAuthor = { login: "skills-book", name: "Skills Book", avatar_url: "", html_url: "https://github.com/ASunYC/skills-book", location: "" };
   const insertRepo = db.prepare(`
 INSERT INTO repositories(full_name, owner, name, html_url, stars, readme, skill_md, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -557,7 +580,33 @@ ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name, description=ex
       now,
     );
   }
+  writeAuthor(db, comboAuthor);
+  for (const { combo, readme } of comboDocs) {
+    const comboSkill = comboAsSkill(combo);
+    const now = new Date().toISOString();
+    insertSkill.run(
+      comboSkill.id,
+      DEFAULT_WIKI_ID,
+      comboSkill.owner,
+      comboSkill.name,
+      comboSkill.display_name,
+      comboSkill.slug,
+      comboSkill.description,
+      comboSkill.url,
+      comboSkill.github_repo,
+      comboSkill.category,
+      comboSkill.source,
+      comboSkill.stars,
+      comboSkill.author_login,
+      null,
+      readme,
+      "",
+      now,
+      now,
+    );
+  }
   rebuildRelations(db);
+  addComboComponentRelations(db, loadCombos());
   const stats = {
     skills: db.prepare("SELECT COUNT(*) AS n FROM skills").get().n,
     pages: db.prepare("SELECT COUNT(*) AS n FROM pages").get().n,
@@ -677,6 +726,9 @@ ORDER BY s.stars DESC
   mkdirSync(dataRoot, { recursive: true });
   writeFileSync(join(dataRoot, "skills-shop-map.json"), JSON.stringify(mapPayload, null, 2), "utf8");
   writeFileSync(join(dataRoot, "skills-shop", "graph.json"), JSON.stringify(graphFromSkillsDb(db), null, 2), "utf8");
+  const combosPayload = comboExportPayload();
+  writeFileSync(join(dataRoot, "skills-shop-combos.json"), JSON.stringify(combosPayload, null, 2), "utf8");
+  writeFileSync(join(dataRoot, "skills-shop", "combos.json"), JSON.stringify(combosPayload, null, 2), "utf8");
   log(`Exported Skills Shop data: ${dataRoot}`);
   log(`  skills=${skills.length}, mappedLocations=${mapLocations.length}`);
 }

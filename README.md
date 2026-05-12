@@ -62,6 +62,8 @@ Skills Book 为 Claude Code、Codex 和 OpenCode 提供了统一的 Agent 命令
 /skills-book top 20
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
+/skills-book combos
+/skills-book combos show coding-research-docs-ui
 /skills-book build-wiki
 /skills-book wiki-query "frontend design"
 /skills-book wiki-graph
@@ -84,6 +86,33 @@ node scripts/skills.mjs <command> [args]
 /skills-book wiki-query "frontend design" --db ./skills.db
 ```
 
+## 推荐组合技能
+
+Skills Book 内置“搭配推荐”数据源，用来收录一组可以一起使用的工具和技能。组合技不要求全部来自 GitHub 仓库，也会在 `build-wiki` 时写入 `skills.db`，并在 `shop-export` 时导出给 io 首页的 Skills Book / Skills Shop 页面使用。
+
+```bash
+# 按分类查看所有推荐组合
+/skills-book combos
+/skills-book combos coding
+
+# 查看某个组合的安装步骤、推荐理由和工作流
+/skills-book combos show coding-research-docs-ui
+```
+
+当前内置的编码组合：
+
+| 组合 | 内容 | 适用场景 |
+|------|------|----------|
+| 编码增强组合 | Firecrawl + Context7 + UI UX Pro Max | 先联网检索最新资料，再查询官方文档，最后优化前端体验 |
+
+该组合的安装命令：
+
+```bash
+npx -y firecrawl-cli@latest init --all --browser
+npx ctx7@latest setup
+uipro init
+```
+
 ---
 
 ## ✨ 功能特性
@@ -92,6 +121,7 @@ node scripts/skills.mjs <command> [args]
 
 - 📦 **多源聚合** - 同时拉取 VoltAgent + heilcheng 两大仓库
 - 🔍 **实时挖掘** - 按 topic、SKILL.md 文件名、关键词搜索 GitHub
+- 🧩 **组合推荐** - 内置推荐组合技能，可按分类查看，并进入 Skills Wiki 与 io 首页静态数据
 - 🔄 **智能去重** - 按 owner/repo 去重，合并重复条目
 - 📂 **分类归一** - 自动合并不同来源的分类名称
 - ⭐ **Stars 排行** - 按 GitHub 热度排序，实时更新

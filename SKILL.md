@@ -19,6 +19,8 @@ When Skills Book is installed in Claude Code, Codex, or OpenCode, prefer the sla
 /skills-book top 20
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
+/skills-book combos
+/skills-book combos show coding-research-docs-ui
 /skills-book build-wiki
 /skills-book wiki-query "frontend design"
 /skills-book wiki-graph
@@ -58,6 +60,7 @@ Use this skill when the user wants to:
 - Browse available agent skills by category
 - Search for a specific skill by name or description
 - Find the most popular skills by GitHub stars
+- View recommended skill/tool combos by category
 - Install or uninstall a skill
 - Update the skills index
 
@@ -126,7 +129,18 @@ node <this_dir>/scripts/skills-book.mjs info "stripe/reasoning"
 node <this_dir>/scripts/skills-book.mjs info "context-compression"
 ```
 
-### 7. Install a Skill
+### 7. Recommended Combos
+
+Show built-in skill/tool combinations for common workflows:
+```
+node <this_dir>/scripts/skills-book.mjs combos
+node <this_dir>/scripts/skills-book.mjs combos coding
+node <this_dir>/scripts/skills-book.mjs combos show coding-research-docs-ui
+```
+
+Combos are also written into `skills.db` during `build-wiki` and exported by `shop-export`.
+
+### 8. Install a Skill
 
 Automatically clone a skill to `~/.claude/skills/`:
 ```
@@ -136,14 +150,14 @@ node <this_dir>/scripts/skills-book.mjs install "microsoft/devskim"
 
 The script finds the skill in the index, clones its GitHub repo, and copies the SKILL.md to the skills directory.
 
-### 8. Uninstall a Skill
+### 9. Uninstall a Skill
 
 Remove a skill from `~/.claude/skills/`:
 ```
 node <this_dir>/scripts/skills-book.mjs uninstall "reasoning"
 ```
 
-### 9. Update Index
+### 10. Update Index
 
 Force re-fetch all skills from GitHub:
 ```
@@ -164,6 +178,9 @@ node <this_dir>/scripts/skills-book.mjs search "testing"
 
 # See what's popular
 node <this_dir>/scripts/skills-book.mjs top 10
+
+# See recommended combos
+node <this_dir>/scripts/skills-book.mjs combos
 
 # Install a skill you like
 node <this_dir>/scripts/skills-book.mjs install "stripe/reasoning"
