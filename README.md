@@ -1,5 +1,30 @@
 # Skills Book
 
+## Agent Slash Command
+
+Skills Book now ships with a single command wrapper for Claude Code, Codex, and OpenCode:
+
+```bash
+/skills fetch --force
+/skills categories
+/skills search "testing"
+/skills top 20
+/skills info "stripe/reasoning"
+/skills install "stripe/reasoning"
+/skills build-wiki
+/skills wiki-query "frontend design"
+/skills wiki-graph
+/skills shop-export ../ASunYC.github.io/docs/public/data
+```
+
+Direct CLI equivalent:
+
+```bash
+node scripts/skills.mjs <command> [args]
+```
+
+Command definitions are included in `commands/skills.md`, `.claude/commands/skills.md`, `.codex/commands/skills.md`, and `.opencode/commands/skills.md`.
+
 > 让 Claude Code 像翻"功法大全"一样的技能宝典，1500+ 技能一键搜索、安装、卸载
 
 <div align="center">

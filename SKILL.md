@@ -8,6 +8,31 @@ origin: local
 
 Browse, search, and install Claude Code skills from the community-maintained awesome-agent-skills repositories.
 
+## Agent Command
+
+When Skills Book is installed in Claude Code, Codex, or OpenCode, prefer the slash command wrapper:
+
+```bash
+/skills fetch --force
+/skills categories
+/skills search "testing"
+/skills top 20
+/skills info "stripe/reasoning"
+/skills install "stripe/reasoning"
+/skills build-wiki
+/skills wiki-query "frontend design"
+/skills wiki-graph
+/skills shop-export ../ASunYC.github.io/docs/public/data
+```
+
+The equivalent direct command is:
+
+```bash
+node path/to/skills-book/scripts/skills.mjs <command> [args]
+```
+
+The wrapper delegates to `scripts/skills-book.mjs` and normalizes aliases such as `query` -> `wiki-query`, `graph` -> `wiki-graph`, and `refresh` -> `fetch`.
+
 ## Trigger
 
 Use this skill when the user wants to:

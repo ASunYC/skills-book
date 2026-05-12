@@ -14,7 +14,11 @@ docker/output
 *.tar
 .DS_Store
 Thumbs.db
-.opencode/
+.opencode/*
+!.opencode/commands/
+!.opencode/commands/*.md
 packages/platform/backend/data/
 .kilo/
-.claude/
+.claude/*
+!.claude/commands/
+!.claude/commands/*.md
