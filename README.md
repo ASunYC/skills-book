@@ -1,30 +1,5 @@
 # Skills Book
 
-## Agent Slash Command
-
-Skills Book now ships with a single command wrapper for Claude Code, Codex, and OpenCode. The command name is `/skills-book` to avoid conflicts with built-in `/skills` commands:
-
-```bash
-/skills-book fetch --force
-/skills-book categories
-/skills-book search "testing"
-/skills-book top 20
-/skills-book info "stripe/reasoning"
-/skills-book install "stripe/reasoning"
-/skills-book build-wiki
-/skills-book wiki-query "frontend design"
-/skills-book wiki-graph
-/skills-book shop-export ../ASunYC.github.io/docs/public/data
-```
-
-Direct CLI equivalent:
-
-```bash
-node scripts/skills.mjs <command> [args]
-```
-
-Command definitions are included in `commands/skills-book.md`, `.claude/commands/skills-book.md`, `.codex/commands/skills-book.md`, and `.opencode/commands/skills-book.md`.
-
 > 让 Claude Code 像翻"功法大全"一样的技能宝典，1500+ 技能一键搜索、安装、卸载
 
 <div align="center">
@@ -73,6 +48,33 @@ Skills Book 是一个聚合多源 awesome-agent-skills 仓库的技能管理工�
 - 自动检测 GitHub 连通性
 - 国内网络自动切换至 gh-proxy 代理
 - 不通就走代理，通的走直连
+
+---
+
+## Agent Slash Command
+
+Skills Book now ships with a single command wrapper for Claude Code, Codex, and OpenCode. The command name is `/skills-book` to avoid conflicts with built-in `/skills` commands:
+
+```bash
+/skills-book fetch --force
+/skills-book categories
+/skills-book search "testing"
+/skills-book top 20
+/skills-book info "stripe/reasoning"
+/skills-book install "stripe/reasoning"
+/skills-book build-wiki
+/skills-book wiki-query "frontend design"
+/skills-book wiki-graph
+/skills-book shop-export ../ASunYC.github.io/docs/public/data
+```
+
+Direct CLI equivalent:
+
+```bash
+node scripts/skills.mjs <command> [args]
+```
+
+Command definitions are included in `commands/skills-book.md`, `.claude/commands/skills-book.md`, `.codex/commands/skills-book.md`, and `.opencode/commands/skills-book.md`.
 
 ---
 
