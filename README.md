@@ -51,9 +51,9 @@ Skills Book 是一个聚合多源 awesome-agent-skills 仓库的技能管理工�
 
 ---
 
-## Agent Slash Command
+## Agent 命令
 
-Skills Book now ships with a single command wrapper for Claude Code, Codex, and OpenCode. The command name is `/skills-book` to avoid conflicts with built-in `/skills` commands:
+Skills Book 为 Claude Code、Codex 和 OpenCode 提供了统一的 Agent 命令入口。命令名使用 `/skills-book`，避免和各类 CLI 自带的 `/skills` 命令冲突：
 
 ```bash
 /skills-book fetch --force
@@ -68,13 +68,13 @@ Skills Book now ships with a single command wrapper for Claude Code, Codex, and 
 /skills-book shop-export ../ASunYC.github.io/docs/public/data
 ```
 
-Direct CLI equivalent:
+对应的命令行调用方式：
 
 ```bash
 node scripts/skills.mjs <command> [args]
 ```
 
-Command definitions are included in `commands/skills-book.md`, `.claude/commands/skills-book.md`, `.codex/commands/skills-book.md`, and `.opencode/commands/skills-book.md`.
+命令定义文件已内置在 `commands/skills-book.md`、`.claude/commands/skills-book.md`、`.codex/commands/skills-book.md` 和 `.opencode/commands/skills-book.md`。
 
 ---
 
