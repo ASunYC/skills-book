@@ -2,7 +2,7 @@
 description: Search, install, update, and build a SQLite wiki for public agent skills.
 ---
 
-# /skills
+# /skills-book
 
 Use this command to operate Skills Book from Codex.
 

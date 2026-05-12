@@ -10,19 +10,19 @@ Browse, search, and install Claude Code skills from the community-maintained awe
 
 ## Agent Command
 
-When Skills Book is installed in Claude Code, Codex, or OpenCode, prefer the slash command wrapper:
+When Skills Book is installed in Claude Code, Codex, or OpenCode, prefer the slash command wrapper. The command is `/skills-book` to avoid conflicts with built-in `/skills` commands:
 
 ```bash
-/skills fetch --force
-/skills categories
-/skills search "testing"
-/skills top 20
-/skills info "stripe/reasoning"
-/skills install "stripe/reasoning"
-/skills build-wiki
-/skills wiki-query "frontend design"
-/skills wiki-graph
-/skills shop-export ../ASunYC.github.io/docs/public/data
+/skills-book fetch --force
+/skills-book categories
+/skills-book search "testing"
+/skills-book top 20
+/skills-book info "stripe/reasoning"
+/skills-book install "stripe/reasoning"
+/skills-book build-wiki
+/skills-book wiki-query "frontend design"
+/skills-book wiki-graph
+/skills-book shop-export ../ASunYC.github.io/docs/public/data
 ```
 
 The equivalent direct command is:

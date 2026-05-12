@@ -3,7 +3,7 @@ description: Search, install, update, and build a SQLite wiki for public agent s
 agent: build
 ---
 
-# /skills
+# /skills-book
 
 Use this command to operate Skills Book from OpenCode.
 
@@ -18,9 +18,9 @@ If the skill is installed in another shared agent directory, locate `scripts/ski
 Examples:
 
 ```bash
-/skills fetch --force
-/skills search "testing"
-/skills top 10
-/skills build-wiki
-/skills wiki-query "frontend design"
+/skills-book fetch --force
+/skills-book search "testing"
+/skills-book top 10
+/skills-book build-wiki
+/skills-book wiki-query "frontend design"
 ```

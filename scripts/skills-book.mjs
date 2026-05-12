@@ -1059,7 +1059,7 @@ function printHelp() {
 Skills Book — Agent Skill Marketplace
 
 Usage: skills-book.mjs <command> [args]
-Agent wrapper: /skills <command> [args]
+Agent wrapper: /skills-book <command> [args]
 
 Commands:
   fetch [--force]          Download & cache skills from GitHub

@@ -3,7 +3,7 @@ description: Search, install, update, and build a SQLite wiki for public agent s
 argument-hint: "<command> [args]"
 ---
 
-# /skills
+# /skills-book
 
 Run the Skills Book command wrapper from the current project directory.
 
@@ -18,10 +18,10 @@ If the skill is installed somewhere else, locate the repository that contains `s
 Examples:
 
 ```bash
-/skills fetch --force
-/skills search "testing"
-/skills top 20
-/skills install "stripe/reasoning"
-/skills build-wiki
-/skills wiki-query "frontend design"
+/skills-book fetch --force
+/skills-book search "testing"
+/skills-book top 20
+/skills-book install "stripe/reasoning"
+/skills-book build-wiki
+/skills-book wiki-query "frontend design"
 ```

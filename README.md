@@ -2,19 +2,19 @@
 
 ## Agent Slash Command
 
-Skills Book now ships with a single command wrapper for Claude Code, Codex, and OpenCode:
+Skills Book now ships with a single command wrapper for Claude Code, Codex, and OpenCode. The command name is `/skills-book` to avoid conflicts with built-in `/skills` commands:
 
 ```bash
-/skills fetch --force
-/skills categories
-/skills search "testing"
-/skills top 20
-/skills info "stripe/reasoning"
-/skills install "stripe/reasoning"
-/skills build-wiki
-/skills wiki-query "frontend design"
-/skills wiki-graph
-/skills shop-export ../ASunYC.github.io/docs/public/data
+/skills-book fetch --force
+/skills-book categories
+/skills-book search "testing"
+/skills-book top 20
+/skills-book info "stripe/reasoning"
+/skills-book install "stripe/reasoning"
+/skills-book build-wiki
+/skills-book wiki-query "frontend design"
+/skills-book wiki-graph
+/skills-book shop-export ../ASunYC.github.io/docs/public/data
 ```
 
 Direct CLI equivalent:
@@ -23,7 +23,7 @@ Direct CLI equivalent:
 node scripts/skills.mjs <command> [args]
 ```
 
-Command definitions are included in `commands/skills.md`, `.claude/commands/skills.md`, `.codex/commands/skills.md`, and `.opencode/commands/skills.md`.
+Command definitions are included in `commands/skills-book.md`, `.claude/commands/skills-book.md`, `.codex/commands/skills-book.md`, and `.opencode/commands/skills-book.md`.
 
 > 让 Claude Code 像翻"功法大全"一样的技能宝典，1500+ 技能一键搜索、安装、卸载
 
@@ -237,7 +237,7 @@ node scripts/skills-book.mjs info "alchaincyf/huashu-design"
 
 在 Claude Code 中直接输入：
 
-- `/skills-fetch` — 一步完成全量刷新（源仓库拉取 + GitHub 实时挖掘）
+- `/skills-book fetch --force` — 一步完成全量刷新（源仓库拉取 + GitHub 实时挖掘）
 
 ---
 

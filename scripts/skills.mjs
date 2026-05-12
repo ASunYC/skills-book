@@ -49,7 +49,7 @@ function normalizeCommand(value) {
   return String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/^\/?skills[:\s-]*/, "");
+    .replace(/^\/?skills-book[:\s-]*/, "");
 }
 
 function printHelp() {
@@ -57,10 +57,10 @@ function printHelp() {
 Skills Book command wrapper
 
 Usage:
-  skills <command> [args]
+  skills-book <command> [args]
 
 Agent slash command:
-  /skills <command> [args]
+  /skills-book <command> [args]
 
 Commands:
   fetch [--force]          Download and cache the public skills index
@@ -79,11 +79,11 @@ Commands:
   shop-export <dir>        Export Skills Shop static data
 
 Examples:
-  /skills fetch --force
-  /skills search "testing"
-  /skills top 20
-  /skills install "stripe/reasoning"
-  /skills build-wiki
-  /skills wiki-query "frontend design"
+  /skills-book fetch --force
+  /skills-book search "testing"
+  /skills-book top 20
+  /skills-book install "stripe/reasoning"
+  /skills-book build-wiki
+  /skills-book wiki-query "frontend design"
 `);
 }
