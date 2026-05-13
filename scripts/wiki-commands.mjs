@@ -585,7 +585,7 @@ ON CONFLICT(full_name) DO UPDATE SET stars=excluded.stars, readme=excluded.readm
   const insertSkill = db.prepare(`
 INSERT INTO skills(id, wiki_id, owner, name, display_name, slug, description, url, github_repo, category, source, stars, author_login, location_id, readme, skill_md, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name, description=excluded.description, stars=excluded.stars, author_login=excluded.author_login, location_id=excluded.location_id, readme=excluded.readme, skill_md=excluded.skill_md, updated_at=excluded.updated_at
+ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name, description=excluded.description, url=excluded.url, github_repo=excluded.github_repo, category=excluded.category, source=excluded.source, stars=excluded.stars, author_login=excluded.author_login, location_id=excluded.location_id, readme=excluded.readme, skill_md=excluded.skill_md, updated_at=excluded.updated_at
 `);
   for (const { skill, docs, author } of records) {
     const slug = skillSlug(skill);

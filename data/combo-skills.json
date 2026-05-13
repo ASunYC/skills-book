@@ -3,57 +3,57 @@
   "categories": [
     {
       "id": "coding",
-      "name": "编码",
-      "description": "面向日常开发、技术调研、前端体验优化和复杂工程实现的推荐组合。"
+      "name": "Coding",
+      "description": "Recommended combinations for daily development, technical research, frontend polish, and complex engineering work."
     }
   ],
   "combos": [
     {
       "id": "coding-research-docs-ui",
-      "title": "编码增强组合",
+      "title": "Coding Research Stack",
       "category": "coding",
-      "summary": "适合需要先检索最新信息、再读取官方文档、最后交付高质量前端体验的编码任务。",
-      "audience": "Claude Code、Codex、OpenCode 等 Agent CLI 用户",
+      "summary": "A practical stack for coding tasks that need fresh web research, current official docs, and polished frontend delivery.",
+      "audience": "Claude Code, Codex, OpenCode, and other agent CLI users",
       "components": [
         {
           "name": "Firecrawl",
-          "type": "工具",
+          "type": "Tool",
           "install": "npx -y firecrawl-cli@latest init --all --browser",
-          "description": "联网搜索和网页抓取工具，让 AI 在开发前先搜索最新技术信息、产品说明和 API 变更。",
-          "why": "适合查询 DeepSeek V4 这类快速变化的 API、博客公告、迁移指南和第三方资料。",
+          "description": "Web search and crawling for collecting the latest technical context, product notes, and API changes before implementation.",
+          "why": "Useful for fast-moving APIs, product announcements, migration guides, and third-party references.",
           "notes": [
-            "执行后会自动打开浏览器。",
-            "在弹出的授权页面完成授权后，Agent 技能管理中会出现 Firecrawl 相关能力。"
+            "The setup command opens a browser for authorization.",
+            "After authorization, Firecrawl capabilities become available in the agent skill manager."
           ]
         },
         {
           "name": "Context7",
-          "type": "工具",
+          "type": "Tool",
           "install": "npx ctx7@latest setup",
-          "description": "技术文档查询工具，让 AI 获取框架、SDK 和库的最新官方文档，减少过时 API 用法。",
-          "why": "适合在实现前确认 React、Next.js、Tailwind、Prisma、OpenAI SDK 等库的当前写法。",
+          "description": "Documentation lookup for current official framework, SDK, and library guidance.",
+          "why": "Helps confirm modern usage for React, Next.js, Tailwind, Prisma, OpenAI SDK, and other dependencies before coding.",
           "notes": [
-            "安装时选择 CLI + Skills。",
-            "授权后无需手动获取和输入 API Key。"
+            "Choose CLI + Skills during setup.",
+            "Authorization avoids manual API key entry."
           ]
         },
         {
           "name": "UI UX Pro Max",
-          "type": "技能",
+          "type": "Skill",
           "install": "npm install -g uipro-cli\nuipro init --ai codex # Codex CLI",
-          "description": "前端体验与视觉质量增强技能包，帮助 Agent 生成更有设计感、更少模板味的页面。",
-          "why": "适合把可运行页面提升为更完整的产品界面，减少随意堆卡片、Emoji 或单调配色。",
+          "description": "Frontend experience and visual quality skill pack for turning working screens into stronger product interfaces.",
+          "why": "Helps reduce template-like layouts, random card piles, overused emoji, and flat color systems.",
           "notes": [
-            "适合作为前端落地阶段的默认美化与交互检查技能。"
+            "Best used during the final UI implementation and interaction review pass."
           ]
         }
       ],
       "workflow": [
-        "先用 Firecrawl 检索最新背景、公告和非结构化网页资料。",
-        "再用 Context7 拉取官方文档，确认 API、配置和版本差异。",
-        "最后用 UI UX Pro Max 完成界面体验、视觉层级和响应式质量优化。"
+        "Use Firecrawl to gather fresh background, announcements, and unstructured web context.",
+        "Use Context7 to confirm official API, configuration, and version-specific guidance.",
+        "Use UI UX Pro Max to improve interaction quality, visual hierarchy, and responsive polish."
       ],
-      "prompt": "我正在做一个编码任务，请先用 Firecrawl 搜索最新资料，再用 Context7 查询官方文档，最后用 UI UX Pro Max 优化前端体验。"
+      "prompt": "I am working on a coding task. Please use Firecrawl for fresh research, Context7 for official documentation, and UI UX Pro Max to refine the frontend experience."
     }
   ]
 }

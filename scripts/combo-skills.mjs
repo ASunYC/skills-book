@@ -31,7 +31,7 @@ export function comboSlug(combo) {
 }
 
 function categoryLabel(categoryId) {
-  return comboCategories().get(categoryId)?.name || categoryId || "未分类";
+  return comboCategories().get(categoryId)?.name || categoryId || "Uncategorized";
 }
 
 function matchesCombo(combo, query) {
@@ -52,42 +52,42 @@ export function comboToMarkdown(combo) {
     "",
     `> ${combo.summary || ""}`,
     "",
-    `- 分类：${categoryLabel(combo.category)}`,
-    `- 适用对象：${combo.audience || "Agent CLI 用户"}`,
-    `- 组合 ID：${combo.id}`,
+    `- Category: ${categoryLabel(combo.category)}`,
+    `- Audience: ${combo.audience || "Agent CLI users"}`,
+    `- Combo ID: ${combo.id}`,
     "",
-    "## 组合内容",
+    "## Components",
     "",
   ];
 
   for (const component of combo.components || []) {
     lines.push(`### ${component.name}`);
     lines.push("");
-    lines.push(`- 类型：${component.type || "工具"}`);
+    lines.push(`- Type: ${component.type || "Tool"}`);
     if (String(component.install || "").includes("\n")) {
-      lines.push("- 安装：");
+      lines.push("- Install:");
       lines.push("");
       lines.push("```bash");
       lines.push(component.install || "");
       lines.push("```");
     } else {
-      lines.push(`- 安装：\`${component.install || ""}\``);
+      lines.push(`- Install: \`${component.install || ""}\``);
     }
-    lines.push(`- 作用：${component.description || ""}`);
-    if (component.why) lines.push(`- 推荐理由：${component.why}`);
-    for (const note of component.notes || []) lines.push(`- 注意：${note}`);
+    lines.push(`- Purpose: ${component.description || ""}`);
+    if (component.why) lines.push(`- Why it helps: ${component.why}`);
+    for (const note of component.notes || []) lines.push(`- Note: ${note}`);
     lines.push("");
   }
 
   if (combo.workflow?.length) {
-    lines.push("## 推荐工作流");
+    lines.push("## Recommended Workflow");
     lines.push("");
     combo.workflow.forEach((step, index) => lines.push(`${index + 1}. ${step}`));
     lines.push("");
   }
 
   if (combo.prompt) {
-    lines.push("## Agent 提示词");
+    lines.push("## Agent Prompt");
     lines.push("");
     lines.push("```text");
     lines.push(combo.prompt);
@@ -109,7 +109,7 @@ export function comboAsSkill(combo) {
     description: combo.summary || "",
     url: `skills-book://combo/${slug}`,
     github_repo: "",
-    category: `组合技能 / ${categoryLabel(combo.category)}`,
+    category: `Combo Skills / ${categoryLabel(combo.category)}`,
     source: "built-in-combo",
     stars: 0,
     author_login: "skills-book",
@@ -155,19 +155,19 @@ export function comboExportPayload() {
 export function printComboHighlights({ limit = 3 } = {}) {
   const combos = loadCombos().slice(0, limit);
   if (!combos.length) return;
-  log("推荐组合技能:");
+  log("Recommended skill/tool combos:");
   for (const combo of combos) {
     const names = (combo.components || []).map((item) => item.name).join(" + ");
     log(`  ${categoryLabel(combo.category)} / ${combo.title}`);
     log(`    ${names}`);
     log(`    ${combo.summary}`);
-    log(`    查看详情: skills-book.mjs combos show ${combo.id}`);
+    log(`    Details: skills-book.mjs combos show ${combo.id}`);
   }
 }
 
 function printComboList(combos) {
   if (!combos.length) {
-    log("没有找到匹配的组合技能。");
+    log("No matching skill/tool combos found.");
     return;
   }
   const categories = comboCategories();
@@ -183,33 +183,33 @@ function printComboList(combos) {
       log(`    ${combo.summary || ""}`);
     }
   }
-  log("\n查看详情: skills-book.mjs combos show <combo-id>");
+  log("\nDetails: skills-book.mjs combos show <combo-id>");
 }
 
 function printComboDetail(combo) {
   log(`\n${combo.title}`);
-  log(`分类: ${categoryLabel(combo.category)}`);
+  log(`Category: ${categoryLabel(combo.category)}`);
   log(`ID: ${combo.id}`);
-  log(`简介: ${combo.summary || ""}`);
-  if (combo.audience) log(`适用对象: ${combo.audience}`);
+  log(`Summary: ${combo.summary || ""}`);
+  if (combo.audience) log(`Audience: ${combo.audience}`);
 
-  log("\n安装与用途:");
+  log("\nInstall and purpose:");
   for (const [index, component] of (combo.components || []).entries()) {
-    log(`${index + 1}. ${component.name} (${component.type || "工具"})`);
+    log(`${index + 1}. ${component.name} (${component.type || "Tool"})`);
     const installLines = String(component.install || "").split("\n");
-    log(`   安装: ${installLines[0] || ""}`);
+    log(`   Install: ${installLines[0] || ""}`);
     for (const line of installLines.slice(1)) log(`         ${line}`);
-    log(`   作用: ${component.description || ""}`);
-    if (component.why) log(`   推荐理由: ${component.why}`);
-    for (const note of component.notes || []) log(`   注意: ${note}`);
+    log(`   Purpose: ${component.description || ""}`);
+    if (component.why) log(`   Why it helps: ${component.why}`);
+    for (const note of component.notes || []) log(`   Note: ${note}`);
   }
 
   if (combo.workflow?.length) {
-    log("\n推荐工作流:");
+    log("\nRecommended workflow:");
     combo.workflow.forEach((step, index) => log(`  ${index + 1}. ${step}`));
   }
   if (combo.prompt) {
-    log("\nAgent 提示词:");
+    log("\nAgent prompt:");
     log(combo.prompt);
   }
 }
