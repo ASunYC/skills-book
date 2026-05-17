@@ -41,7 +41,13 @@ function matchesCombo(combo, query) {
     combo.id,
     combo.title,
     combo.category,
+    categoryLabel(combo.category),
     combo.summary,
+    combo.audience,
+    combo.prompt,
+    ...(combo.tags || []),
+    ...(combo.useCases || []),
+    ...(combo.workflow || []),
     ...(combo.components || []).map((item) => `${item.name} ${item.type} ${item.description}`),
   ].some((value) => String(value || "").toLowerCase().includes(q));
 }
@@ -56,9 +62,17 @@ export function comboToMarkdown(combo) {
     `- Audience: ${combo.audience || "Agent CLI users"}`,
     `- Combo ID: ${combo.id}`,
     "",
-    "## Components",
-    "",
   ];
+
+  if (combo.useCases?.length) {
+    lines.push("## Best For");
+    lines.push("");
+    for (const useCase of combo.useCases) lines.push(`- ${useCase}`);
+    lines.push("");
+  }
+
+  lines.push("## Components");
+  lines.push("");
 
   for (const component of combo.components || []) {
     lines.push(`### ${component.name}`);
@@ -181,6 +195,7 @@ function printComboList(combos) {
       log(`  - ${combo.title} (${combo.id})`);
       log(`    ${names}`);
       log(`    ${combo.summary || ""}`);
+      if (combo.useCases?.length) log(`    Best for: ${combo.useCases.slice(0, 2).join("; ")}`);
     }
   }
   log("\nDetails: skills-book.mjs combos show <combo-id>");
@@ -192,6 +207,8 @@ function printComboDetail(combo) {
   log(`ID: ${combo.id}`);
   log(`Summary: ${combo.summary || ""}`);
   if (combo.audience) log(`Audience: ${combo.audience}`);
+  if (combo.useCases?.length) log(`Best for: ${combo.useCases.join("; ")}`);
+  if (combo.tags?.length) log(`Tags: ${combo.tags.join(", ")}`);
 
   log("\nInstall and purpose:");
   for (const [index, component] of (combo.components || []).entries()) {

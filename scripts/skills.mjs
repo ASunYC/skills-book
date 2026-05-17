@@ -17,6 +17,9 @@ const COMMAND_ALIASES = {
   popular: "top",
   refresh: "fetch",
   combo: "combos",
+  combos: "combos",
+  "combo-search": "combos",
+  rec: "combos",
   recommend: "combos",
   recommendations: "combos",
   graph: "wiki-graph",
@@ -76,7 +79,7 @@ Commands:
   uninstall <name>         Uninstall a skill
   discover                 Discover new GitHub skills
   add/remove/update        Manage local skills index
-  combos [category]        Show recommended skill/tool combos
+  combos [query]           Search recommended skill/tool combos
   combos show <combo-id>   Show combo install steps and workflow
   build-wiki [--limit N] [--db file] [--extract]
                            Build skills.db through llm-wiki-build-skill
@@ -90,6 +93,7 @@ Examples:
   /skills-book top 20
   /skills-book install "stripe/reasoning"
   /skills-book combos
+  /skills-book recommend security
   /skills-book combos show coding-research-docs-ui
   /skills-book build-wiki
   /skills-book wiki-query "frontend design"

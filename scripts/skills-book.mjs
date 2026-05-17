@@ -1075,7 +1075,7 @@ Commands:
   remove <owner/name>      Remove a manually added skill
   discover                 Search GitHub for new skills via topics, code, and keywords
   update                   Re-fetch all skills and refresh cache
-  combos [category]        List built-in recommended skill/tool combos
+  combos [query]           Search built-in recommended skill/tool combos
   combos show <combo-id>   Show install steps and workflow for a combo
   build-wiki [--limit N] [--db file] [--extract]
                            Build SQLite skills.db through llm-wiki-build-skill
@@ -1094,6 +1094,7 @@ Examples:
   skills-book.mjs install "stripe/reasoning"
   skills-book.mjs uninstall "reasoning"
   skills-book.mjs combos
+  skills-book.mjs recommend security
   skills-book.mjs combos show coding-research-docs-ui
   skills-book.mjs build-wiki
   skills-book.mjs wiki-query "frontend design"
@@ -1147,6 +1148,8 @@ async function main() {
       break;
     case "combos":
     case "combo":
+    case "combo-search":
+    case "rec":
     case "recommend":
     case "recommendations":
       cmdCombos(args.slice(1));

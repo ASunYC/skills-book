@@ -33,6 +33,7 @@ node <skill-root>/scripts/skills.mjs $ARGUMENTS
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
 /skills-book combos
+/skills-book recommend security
 /skills-book combos show coding-research-docs-ui
 /skills-book build-wiki
 /skills-book wiki-query "frontend design"

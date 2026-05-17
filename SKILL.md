@@ -20,6 +20,7 @@ When Skills Book is installed in Claude Code, Codex, or OpenCode, prefer the sla
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
 /skills-book combos
+/skills-book recommend security
 /skills-book combos show coding-research-docs-ui
 /skills-book build-wiki
 /skills-book wiki-query "frontend design"
@@ -134,7 +135,8 @@ node <this_dir>/scripts/skills-book.mjs info "context-compression"
 Show built-in skill/tool combinations for common workflows:
 ```
 node <this_dir>/scripts/skills-book.mjs combos
-node <this_dir>/scripts/skills-book.mjs combos coding
+node <this_dir>/scripts/skills-book.mjs combos frontend
+node <this_dir>/scripts/skills-book.mjs recommend security
 node <this_dir>/scripts/skills-book.mjs combos show coding-research-docs-ui
 ```
 

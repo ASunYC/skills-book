@@ -1,10 +1,40 @@
 {
-  "version": 1,
+  "version": 2,
   "categories": [
     {
       "id": "coding",
       "name": "Coding",
       "description": "Recommended combinations for daily development, technical research, frontend polish, and complex engineering work."
+    },
+    {
+      "id": "frontend",
+      "name": "Frontend",
+      "description": "Combinations for turning working pages into tested, responsive, production-quality product surfaces."
+    },
+    {
+      "id": "quality",
+      "name": "Quality",
+      "description": "Combinations for test strategy, browser validation, debugging, and release confidence."
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "description": "Combinations for threat modeling, secure implementation, static analysis, and review."
+    },
+    {
+      "id": "documents",
+      "name": "Documents",
+      "description": "Combinations for documents, slides, spreadsheets, PDFs, and report production."
+    },
+    {
+      "id": "product-growth",
+      "name": "Product & Growth",
+      "description": "Combinations for product discovery, market learning, growth experiments, and founder workflows."
+    },
+    {
+      "id": "data-backend",
+      "name": "Data & Backend",
+      "description": "Combinations for API design, databases, GraphQL, and production data access patterns."
     }
   ],
   "combos": [
@@ -14,6 +44,12 @@
       "category": "coding",
       "summary": "A practical stack for coding tasks that need fresh web research, current official docs, and polished frontend delivery.",
       "audience": "Claude Code, Codex, OpenCode, and other agent CLI users",
+      "tags": ["research", "docs", "frontend", "implementation", "current APIs"],
+      "useCases": [
+        "Fast-moving libraries or SDKs where stale API syntax is risky.",
+        "Feature work that includes a visible UI and needs a final polish pass.",
+        "Technical research before implementation."
+      ],
       "components": [
         {
           "name": "Firecrawl",
@@ -54,6 +90,306 @@
         "Use UI UX Pro Max to improve interaction quality, visual hierarchy, and responsive polish."
       ],
       "prompt": "I am working on a coding task. Please use Firecrawl for fresh research, Context7 for official documentation, and UI UX Pro Max to refine the frontend experience."
+    },
+    {
+      "id": "frontend-production-review",
+      "title": "Frontend Production Review",
+      "category": "frontend",
+      "summary": "A design, browser, and deployment review path for frontend work that must look right and behave correctly before release.",
+      "audience": "Frontend builders shipping websites, dashboards, apps, or interactive product surfaces",
+      "tags": ["frontend", "design", "playwright", "browser QA", "deployment", "responsive"],
+      "useCases": [
+        "A page works locally but needs interaction, layout, and visual QA.",
+        "You need screenshots or browser evidence before shipping.",
+        "You want deployment guidance after a UI implementation pass."
+      ],
+      "components": [
+        {
+          "name": "openai/frontend-skill",
+          "type": "Skill",
+          "install": "skills-book install \"openai/frontend-skill\"",
+          "description": "Build visually strong landing pages, websites, and app UIs with restrained composition.",
+          "why": "Gives the agent frontend-specific taste and interaction constraints before it starts editing."
+        },
+        {
+          "name": "anthropics/webapp-testing",
+          "type": "Skill",
+          "install": "skills-book install \"anthropics/webapp-testing\"",
+          "description": "Test local web applications using Playwright.",
+          "why": "Turns frontend delivery into a browser-verified workflow instead of a static code change."
+        },
+        {
+          "name": "openai/playwright-interactive",
+          "type": "Skill",
+          "install": "skills-book install \"openai/playwright-interactive\"",
+          "description": "Use a persistent browser session for iterative UI debugging and screenshot review.",
+          "why": "Useful when fixes require repeated visual checks across states or viewports."
+        },
+        {
+          "name": "openai/vercel-deploy",
+          "type": "Skill",
+          "install": "skills-book install \"openai/vercel-deploy\"",
+          "description": "Deploy applications and websites to Vercel with preview or production options.",
+          "why": "Completes the loop from local UI work to a shareable deployment."
+        }
+      ],
+      "workflow": [
+        "Apply frontend implementation guidance before touching the visible experience.",
+        "Run local browser testing against the most important user paths.",
+        "Use an interactive Playwright pass to inspect responsive and dynamic states.",
+        "Deploy a preview and record any release notes or verification evidence."
+      ],
+      "prompt": "Please treat this as a frontend production review: improve the UI, verify it in a real browser, capture the issues you fixed, and prepare it for preview deployment."
+    },
+    {
+      "id": "quality-release-loop",
+      "title": "Quality Release Loop",
+      "category": "quality",
+      "summary": "A testing and debugging stack for moving from implementation to confidence with unit, integration, browser, and CI checks.",
+      "audience": "Developers who want a repeatable pre-release validation flow",
+      "tags": ["testing", "debugging", "e2e", "CI", "release", "QA"],
+      "useCases": [
+        "A feature is complete but needs a clean verification pass.",
+        "Tests are failing and need systematic triage.",
+        "A release needs evidence that critical paths still work."
+      ],
+      "components": [
+        {
+          "name": "anthropics/webapp-testing",
+          "type": "Skill",
+          "install": "skills-book install \"anthropics/webapp-testing\"",
+          "description": "Run Playwright-driven validation against local web applications.",
+          "why": "Catches end-user regressions that unit tests often miss."
+        },
+        {
+          "name": "testdino-hq/playwright-skill",
+          "type": "Skill",
+          "install": "skills-book install \"testdino-hq/playwright-skill\"",
+          "description": "Production-tested Playwright automation patterns, page objects, CI/CD, and migration guidance.",
+          "why": "Adds deeper E2E design patterns when the suite needs to scale."
+        },
+        {
+          "name": "openai/gh-fix-ci",
+          "type": "Skill",
+          "install": "skills-book install \"openai/gh-fix-ci\"",
+          "description": "Debug and fix failing GitHub Actions checks using CLI log inspection.",
+          "why": "Connects local fixes to CI evidence instead of leaving release confidence local-only."
+        },
+        {
+          "name": "openai/yeet",
+          "type": "Skill",
+          "install": "skills-book install \"openai/yeet\"",
+          "description": "Stage, commit, push, and open a GitHub pull request via CLI.",
+          "why": "Packages verified work into a clean reviewable change."
+        }
+      ],
+      "workflow": [
+        "Identify the critical user journeys and minimum test evidence required.",
+        "Run or write browser tests for those journeys.",
+        "Triage local and CI failures with logs, screenshots, and minimal fixes.",
+        "Package the release change with a concise verification summary."
+      ],
+      "prompt": "Please run a quality release loop: identify critical flows, verify them with tests or browser checks, fix failures, and summarize release confidence."
+    },
+    {
+      "id": "security-audit-stack",
+      "title": "Security Audit Stack",
+      "category": "security",
+      "summary": "Threat model first, then review implementation risks with secure coding guidance and static analysis support.",
+      "audience": "Developers and reviewers handling auth, APIs, payments, user input, or sensitive data",
+      "tags": ["security", "threat model", "SAST", "semgrep", "code review", "OWASP"],
+      "useCases": [
+        "A PR touches authentication, authorization, input handling, or secrets.",
+        "You need an AppSec checklist before merging a feature.",
+        "You want to turn review findings into concrete remediation tasks."
+      ],
+      "components": [
+        {
+          "name": "openai/security-threat-model",
+          "type": "Skill",
+          "install": "skills-book install \"openai/security-threat-model\"",
+          "description": "Generate repo-specific threat models identifying assets and trust boundaries.",
+          "why": "Keeps security review anchored in actual data flows instead of generic checklists."
+        },
+        {
+          "name": "openai/security-best-practices",
+          "type": "Skill",
+          "install": "skills-book install \"openai/security-best-practices\"",
+          "description": "Review code for language-specific security vulnerabilities.",
+          "why": "Adds implementation-level checks for common insecure patterns."
+        },
+        {
+          "name": "trailofbits/static-analysis",
+          "type": "Skill",
+          "install": "skills-book install \"trailofbits/static-analysis\"",
+          "description": "Static analysis toolkit guidance with CodeQL, Semgrep, and SARIF.",
+          "why": "Helps move from manual review to repeatable tool-backed evidence."
+        },
+        {
+          "name": "trailofbits/semgrep-rule-creator",
+          "type": "Skill",
+          "install": "skills-book install \"trailofbits/semgrep-rule-creator\"",
+          "description": "Create and refine Semgrep rules for vulnerability detection.",
+          "why": "Useful when a project-specific risk should become a reusable rule."
+        }
+      ],
+      "workflow": [
+        "Model assets, trust boundaries, and abuse cases before reviewing code.",
+        "Review the changed code against secure coding guidance.",
+        "Run or design static analysis checks for repeatable findings.",
+        "Convert findings into prioritized remediation tasks with verification steps."
+      ],
+      "prompt": "Please run this as a security audit: build a threat model, review the implementation, use static-analysis guidance where helpful, and return prioritized findings with fixes."
+    },
+    {
+      "id": "office-document-suite",
+      "title": "Office Document Suite",
+      "category": "documents",
+      "summary": "A document production stack for Word docs, slide decks, spreadsheets, and PDFs with layout-aware review.",
+      "audience": "Operators, founders, analysts, and consultants producing client-ready documents",
+      "tags": ["documents", "pptx", "docx", "xlsx", "pdf", "reports", "slides"],
+      "useCases": [
+        "Turn research into a polished memo, deck, spreadsheet, or PDF.",
+        "Review existing business documents while preserving formatting.",
+        "Produce a lightweight data-backed report from mixed materials."
+      ],
+      "components": [
+        {
+          "name": "openai/doc",
+          "type": "Skill",
+          "install": "skills-book install \"openai/doc\"",
+          "description": "Read, create, and edit .docx documents with formatting and layout fidelity.",
+          "why": "Gives the agent a reliable workflow for narrative deliverables."
+        },
+        {
+          "name": "openai/slides",
+          "type": "Skill",
+          "install": "skills-book install \"openai/slides\"",
+          "description": "Create and edit .pptx presentation decks.",
+          "why": "Turns strategy, research, and analysis into a shareable deck format."
+        },
+        {
+          "name": "openai/spreadsheet",
+          "type": "Skill",
+          "install": "skills-book install \"openai/spreadsheet\"",
+          "description": "Create, edit, analyze, and visualize spreadsheets with formulas.",
+          "why": "Covers the structured data layer behind a recommendation or report."
+        },
+        {
+          "name": "openai/pdf",
+          "type": "Skill",
+          "install": "skills-book install \"openai/pdf\"",
+          "description": "Read, create, and review PDFs with layout and visual formatting integrity.",
+          "why": "Useful for source extraction, final review, and format-sensitive delivery."
+        }
+      ],
+      "workflow": [
+        "Extract source material from PDFs, docs, spreadsheets, or notes.",
+        "Build the analytical spine in a spreadsheet where numbers matter.",
+        "Draft the narrative in a document or deck.",
+        "Review final exports for layout, citations, and formatting integrity."
+      ],
+      "prompt": "Please use the document suite workflow: extract the source material, structure the analysis, create the requested deliverable, and check formatting before handing it back."
+    },
+    {
+      "id": "product-growth-lab",
+      "title": "Product Growth Lab",
+      "category": "product-growth",
+      "summary": "A founder and PM stack for turning market questions into strategy, experiments, acquisition channels, and marketing output.",
+      "audience": "Indie hackers, startup founders, PMs, and growth teams",
+      "tags": ["product", "growth", "marketing", "experiments", "strategy", "PM"],
+      "useCases": [
+        "A founder needs a practical plan from idea to first growth tests.",
+        "A PM needs discovery artifacts and experiment recommendations.",
+        "A team wants marketing copy, analytics questions, and channel bets together."
+      ],
+      "components": [
+        {
+          "name": "deanpeters/opportunity-solution-tree",
+          "type": "Skill",
+          "install": "skills-book install \"deanpeters/opportunity-solution-tree\"",
+          "description": "Generate opportunities and solutions and recommend proof-of-concept tests.",
+          "why": "Starts with customer outcomes instead of jumping directly to features."
+        },
+        {
+          "name": "phuryn/swot-analysis",
+          "type": "Skill",
+          "install": "skills-book install \"phuryn/swot-analysis\"",
+          "description": "SWOT analysis with actionable recommendations per quadrant.",
+          "why": "Gives a quick strategic map before choosing experiments."
+        },
+        {
+          "name": "deanpeters/acquisition-channel-advisor",
+          "type": "Skill",
+          "install": "skills-book install \"deanpeters/acquisition-channel-advisor\"",
+          "description": "Evaluate channels using unit economics and recommend scale, test, or kill decisions.",
+          "why": "Connects growth ideas to cost, conversion, and operating constraints."
+        },
+        {
+          "name": "zubair-trabzada/ai-marketing-claude",
+          "type": "Skill",
+          "install": "skills-book install \"zubair-trabzada/ai-marketing-claude\"",
+          "description": "AI marketing suite for audits, copy, email sequences, ad campaigns, and client-ready reports.",
+          "why": "Turns strategy into concrete marketing assets and campaign drafts."
+        }
+      ],
+      "workflow": [
+        "Map customer opportunities and solution bets.",
+        "Assess strategic position and constraints.",
+        "Select acquisition channels with economics-aware recommendations.",
+        "Generate the first round of marketing assets and experiment briefs."
+      ],
+      "prompt": "Please run a product growth lab: map opportunities, assess strategic tradeoffs, choose growth channels, and produce concrete experiment and marketing recommendations."
+    },
+    {
+      "id": "data-backend-api-stack",
+      "title": "Data Backend API Stack",
+      "category": "data-backend",
+      "summary": "A backend stack for API shape, database correctness, GraphQL design, and framework-specific implementation choices.",
+      "audience": "Backend and full-stack developers building data-heavy product features",
+      "tags": ["backend", "api", "database", "postgres", "graphql", "supabase", "apollo"],
+      "useCases": [
+        "A feature needs a clean API contract and durable database design.",
+        "The app uses Supabase/Postgres and needs production-minded SQL patterns.",
+        "A team is adding or reviewing GraphQL schemas and operations."
+      ],
+      "components": [
+        {
+          "name": "openai/openai-docs",
+          "type": "Skill",
+          "install": "skills-book install \"openai/openai-docs\"",
+          "description": "Use current OpenAI developer documentation when building with OpenAI APIs.",
+          "why": "Covers the AI API layer when backend features call OpenAI services."
+        },
+        {
+          "name": "supabase/postgres-best-practices",
+          "type": "Skill",
+          "install": "skills-book install \"supabase/postgres-best-practices\"",
+          "description": "PostgreSQL best practices for Supabase projects.",
+          "why": "Helps with schema design, indexes, policies, and query performance."
+        },
+        {
+          "name": "apollographql/graphql-schema",
+          "type": "Skill",
+          "install": "skills-book install \"apollographql/graphql-schema\"",
+          "description": "Reference guide for designing clean, evolvable GraphQL schemas.",
+          "why": "Keeps domain modeling and API evolution explicit."
+        },
+        {
+          "name": "apollographql/apollo-server",
+          "type": "Skill",
+          "install": "skills-book install \"apollographql/apollo-server\"",
+          "description": "Build GraphQL servers using Apollo Server.",
+          "why": "Adds implementation guidance for teams using Apollo in production."
+        }
+      ],
+      "workflow": [
+        "Clarify the domain model and API contract before coding.",
+        "Design tables, indexes, and access policies with Postgres guidance.",
+        "Design GraphQL schema and operations for client needs.",
+        "Implement backend code and verify queries, permissions, and error handling."
+      ],
+      "prompt": "Please use the data backend API stack: design the API and schema first, apply database best practices, then implement and verify the backend behavior."
     }
   ]
 }
