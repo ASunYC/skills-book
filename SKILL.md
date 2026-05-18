@@ -19,6 +19,9 @@ When Skills Book is installed in Claude Code, Codex, or OpenCode, prefer the sla
 /skills-book top 20
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
+/skills-book agents discover
+/skills-book agents top 20
+/skills-book agents search "OpenCLI"
 /skills-book combos
 /skills-book recommend security
 /skills-book combos show coding-research-docs-ui
@@ -61,6 +64,7 @@ Use this skill when the user wants to:
 - Browse available agent skills by category
 - Search for a specific skill by name or description
 - Find the most popular skills by GitHub stars
+- Search and rank AI agent/tool repositories in a separate agent index
 - View recommended skill/tool combos by category
 - Install or uninstall a skill
 - Update the skills index
@@ -142,7 +146,16 @@ node <this_dir>/scripts/skills-book.mjs combos show coding-research-docs-ui
 
 Combos are also written into `skills.db` during `build-wiki` and exported by `shop-export`.
 
-### 8. Install a Skill
+### 8. Agent Index
+
+Build and query a separate AI agent/tool repository index. Agent results do not appear in normal skill search, categories, or top rankings:
+```
+node <this_dir>/scripts/skills-book.mjs agents discover
+node <this_dir>/scripts/skills-book.mjs agents top 20
+node <this_dir>/scripts/skills-book.mjs agents search "OpenCLI"
+```
+
+### 9. Install a Skill
 
 Automatically clone a skill to `~/.claude/skills/`:
 ```
@@ -152,14 +165,14 @@ node <this_dir>/scripts/skills-book.mjs install "microsoft/devskim"
 
 The script finds the skill in the index, clones its GitHub repo, and copies the SKILL.md to the skills directory.
 
-### 9. Uninstall a Skill
+### 10. Uninstall a Skill
 
 Remove a skill from `~/.claude/skills/`:
 ```
 node <this_dir>/scripts/skills-book.mjs uninstall "reasoning"
 ```
 
-### 10. Update Index
+### 11. Update Index
 
 Force re-fetch all skills from GitHub:
 ```

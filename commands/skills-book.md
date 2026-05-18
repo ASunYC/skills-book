@@ -32,6 +32,9 @@ node <skill-root>/scripts/skills.mjs $ARGUMENTS
 /skills-book top 20
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
+/skills-book agents discover
+/skills-book agents top 20
+/skills-book agents search "OpenCLI"
 /skills-book combos
 /skills-book recommend security
 /skills-book combos show coding-research-docs-ui

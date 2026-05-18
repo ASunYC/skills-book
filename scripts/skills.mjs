@@ -15,6 +15,11 @@ const COMMAND_ALIASES = {
   details: "info",
   get: "info",
   popular: "top",
+  agent: "agents",
+  agents: "agents",
+  "agent-search": "agents",
+  "agent-top": "agents",
+  "agent-rank": "agents",
   refresh: "fetch",
   combo: "combos",
   combos: "combos",
@@ -78,6 +83,9 @@ Commands:
   install <owner/name>     Install a skill
   uninstall <name>         Uninstall a skill
   discover                 Discover new GitHub skills
+  agents discover          Build a separate AI agent/tool index
+  agents search <query>    Search AI agent/tool repos
+  agents top [N]           Show AI agent/tool repo ranking
   add/remove/update        Manage local skills index
   combos [query]           Search recommended skill/tool combos
   combos show <combo-id>   Show combo install steps and workflow
@@ -92,6 +100,9 @@ Examples:
   /skills-book search "testing"
   /skills-book top 20
   /skills-book install "stripe/reasoning"
+  /skills-book agents discover
+  /skills-book agents top 20
+  /skills-book agents search "OpenCLI"
   /skills-book combos
   /skills-book recommend security
   /skills-book combos show coding-research-docs-ui

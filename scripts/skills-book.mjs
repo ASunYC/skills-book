@@ -13,6 +13,7 @@ import { cmdBuildWiki, cmdShopExport, cmdWikiGraph, cmdWikiQuery } from "./wiki-
 const CACHE_DIR = join(homedir(), ".claude", "skills-book", "cache");
 const CACHE_FILE = join(CACHE_DIR, "skills-index.json");
 const MANUAL_SKILLS_FILE = join(CACHE_DIR, "manual-skills.json");
+const AGENTS_CACHE_FILE = join(CACHE_DIR, "agents-index.json");
 const SKILLS_INSTALL_DIR = join(homedir(), ".claude", "skills");
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const STARS_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -61,10 +62,23 @@ function writeCache(data) {
   writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
-function readManualSkills() {
+function isUnverifiedDiscoveredSkill(skill) {
+  const source = String(skill?.source || "");
+  return source.startsWith("discover:") && skill?.discovery_verified !== "root-skill-entry";
+}
+
+function filterUnverifiedDiscoveredSkills(skills) {
+  return Object.fromEntries(
+    Object.entries(skills || {}).filter(([, skill]) => !isUnverifiedDiscoveredSkill(skill)),
+  );
+}
+
+function readManualSkills(options = {}) {
   if (!existsSync(MANUAL_SKILLS_FILE)) return {};
   try {
-    return JSON.parse(readFileSync(MANUAL_SKILLS_FILE, "utf8"));
+    const skills = JSON.parse(readFileSync(MANUAL_SKILLS_FILE, "utf8"));
+    if (options.includeUnverifiedDiscoveries) return skills;
+    return filterUnverifiedDiscoveredSkills(skills);
   } catch {
     return {};
   }
@@ -73,6 +87,20 @@ function readManualSkills() {
 function writeManualSkills(skills) {
   ensureCacheDir();
   writeFileSync(MANUAL_SKILLS_FILE, JSON.stringify(skills, null, 2), "utf8");
+}
+
+function readAgentsCache() {
+  if (!existsSync(AGENTS_CACHE_FILE)) return null;
+  try {
+    return JSON.parse(readFileSync(AGENTS_CACHE_FILE, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function writeAgentsCache(data) {
+  ensureCacheDir();
+  writeFileSync(AGENTS_CACHE_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
 const GH_PROXY = "https://gh-proxy.org";
@@ -555,6 +583,7 @@ function ensureCache() {
     log("No cache found. Running fetch first...");
     return null;
   }
+  cache.skills = filterUnverifiedDiscoveredSkills(cache.skills);
   // Merge manual skills into cache for queries
   const manual = readManualSkills();
   for (const [key, skill] of Object.entries(manual)) {
@@ -847,6 +876,219 @@ async function searchGitHubCode(query, perPage = 100) {
   }
 }
 
+function repoHasDiscoverCandidateSignal(repo) {
+  const description = String(repo.description || "").toLowerCase();
+  const name = String(repo.name || "").toLowerCase();
+  const fullName = String(repo.full_name || "").toLowerCase();
+  const topics = (repo.topics || []).map((topic) => String(topic || "").toLowerCase());
+
+  return (
+    description.includes("skill") ||
+    topics.some((topic) => topic.includes("skill")) ||
+    description.includes("agent.md") ||
+    name.includes("opencli") ||
+    description.includes("opencli") ||
+    fullName.includes("opencli")
+  );
+}
+
+async function githubRootHasSkillEntry(repo) {
+  if (!repo?.full_name) return false;
+  const branches = [...new Set([repo.default_branch, "main", "master"].filter(Boolean))];
+  const directOk = await isGitHubAccessible();
+  const headers = {};
+  if (directOk && process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+
+  for (const branch of branches) {
+    const url = `https://api.github.com/repos/${repo.full_name}/contents?ref=${encodeURIComponent(branch)}`;
+    const requestUrl = directOk ? url : maybeProxyUrl(url);
+    try {
+      const res = await fetch(requestUrl, { headers });
+      if (res.ok) {
+        const entries = await res.json();
+        return Array.isArray(entries) && entries.some((entry) => {
+          const name = String(entry.name || "").toLowerCase();
+          return (entry.type === "file" && name === "skill.md") || (entry.type === "dir" && name === "skills");
+        });
+      }
+      if (res.status === 403) throw new Error("rate_limited");
+    } catch (e) {
+      if (e.message === "rate_limited") throw e;
+      return false;
+    }
+  }
+  return false;
+}
+
+async function repoMatchesDiscoverFilter(repo) {
+  if (!repoHasDiscoverCandidateSignal(repo)) return false;
+  return githubRootHasSkillEntry(repo);
+}
+
+function discoveredSkillFromRepo(repo, source) {
+  return {
+    owner: repo.owner.login.toLowerCase(),
+    name: repo.name.toLowerCase(),
+    display_name: `${repo.owner.login}/${repo.name}`,
+    description: repo.description || "No description",
+    url: repo.html_url,
+    github_repo: repo.full_name,
+    category: "Discovered",
+    source,
+    discovery_verified: "root-skill-entry",
+    stars: repo.stargazers_count,
+  };
+}
+
+const AGENT_TOPIC_QUERIES = [
+  "topic:ai-agent",
+  "topic:ai-agents",
+  "topic:ai-tools",
+];
+
+function repoHasAgentSignal(repo) {
+  const description = String(repo.description || "").toLowerCase();
+  const name = String(repo.name || "").toLowerCase();
+  const fullName = String(repo.full_name || "").toLowerCase();
+  const topics = (repo.topics || []).map((topic) => String(topic || "").toLowerCase());
+
+  return (
+    name.includes("agent") ||
+    fullName.includes("agent") ||
+    description.includes("agent") ||
+    topics.some((topic) => topic.includes("agent"))
+  );
+}
+
+function agentFromRepo(repo, source) {
+  return {
+    owner: repo.owner.login.toLowerCase(),
+    name: repo.name.toLowerCase(),
+    display_name: `${repo.owner.login}/${repo.name}`,
+    description: repo.description || "No description",
+    url: repo.html_url,
+    github_repo: repo.full_name,
+    topics: repo.topics || [],
+    source,
+    stars: repo.stargazers_count || 0,
+    updated_at: repo.updated_at || null,
+  };
+}
+
+function ensureAgentsCache() {
+  const cache = readAgentsCache();
+  if (!cache || !cache.agents || Object.keys(cache.agents).length === 0) {
+    log("No agent cache found. Run `skills-book.mjs agents discover` first.");
+    return null;
+  }
+  return cache;
+}
+
+async function cmdAgents(args = []) {
+  const action = (args[0] || "top").toLowerCase();
+  const rest = args.slice(1);
+
+  if (["discover", "fetch", "update", "refresh"].includes(action)) {
+    await cmdAgentsDiscover();
+    return;
+  }
+
+  if (["search", "find"].includes(action)) {
+    cmdAgentsSearch(rest.join(" "));
+    return;
+  }
+
+  if (["top", "rank", "ranking", "list"].includes(action)) {
+    cmdAgentsTop(parseInt(rest[0], 10) || 20);
+    return;
+  }
+
+  cmdAgentsSearch(args.join(" "));
+}
+
+async function cmdAgentsDiscover() {
+  log("Discovering AI agents from GitHub...\n");
+  const agents = {};
+
+  for (const query of AGENT_TOPIC_QUERIES) {
+    try {
+      const repos = await searchGitHubRepos(query);
+      for (const repo of repos) {
+        if (!repoHasAgentSignal(repo)) continue;
+        const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
+        agents[key] = agentFromRepo(repo, `discover:${query}`);
+      }
+    } catch (e) {
+      logErr(`  Skipped "${query}": ${e.message}`);
+    }
+  }
+
+  const data = {
+    version: 1,
+    updated_at: new Date().toISOString(),
+    sources: AGENT_TOPIC_QUERIES,
+    total_count: Object.keys(agents).length,
+    agents,
+  };
+  writeAgentsCache(data);
+
+  log(`\nDone! ${data.total_count} AI agent/tool repos cached separately.`);
+  cmdAgentsTop(20, data);
+}
+
+function cmdAgentsSearch(query) {
+  const cache = ensureAgentsCache();
+  if (!cache) return;
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) {
+    cmdAgentsTop(20, cache);
+    return;
+  }
+
+  const results = Object.entries(cache.agents)
+    .filter(([, agent]) => [
+      agent.display_name,
+      agent.name,
+      agent.owner,
+      agent.description,
+      agent.github_repo,
+      ...(agent.topics || []),
+    ].some((value) => String(value || "").toLowerCase().includes(q)))
+    .sort((a, b) => (b[1].stars || 0) - (a[1].stars || 0));
+
+  if (!results.length) {
+    log(`No agents found for "${query}".`);
+    return;
+  }
+
+  log(`\nAgent search results for "${query}" (${results.length}):\n`);
+  printAgentRows(results.slice(0, 50));
+  if (results.length > 50) log(`  ... and ${results.length - 50} more results`);
+  log("");
+}
+
+function cmdAgentsTop(n = 20, cache = null) {
+  const data = cache || ensureAgentsCache();
+  if (!data) return;
+  const results = Object.entries(data.agents)
+    .sort((a, b) => (b[1].stars || 0) - (a[1].stars || 0))
+    .slice(0, n);
+
+  log(`\nTop ${results.length} AI Agent Repos by GitHub Stars:\n`);
+  printAgentRows(results);
+  log("");
+}
+
+function printAgentRows(rows) {
+  for (const [, agent] of rows) {
+    const starStr = `★${(agent.stars || 0).toLocaleString()}`;
+    const urlStr = agent.github_repo ? `https://github.com/${agent.github_repo}` : agent.url || "";
+    const descWithUrl = urlStr ? `${agent.description} (${urlStr})` : agent.description;
+    log(`  ${agent.name.padEnd(32)} ${agent.owner.padEnd(18)} ${starStr.padStart(9)}  ${descWithUrl}`);
+    log("");
+  }
+}
+
 async function cmdDiscover(args) {
   log("Discovering skills from GitHub...\n");
 
@@ -876,17 +1118,8 @@ async function cmdDiscover(args) {
       for (const repo of repos) {
         const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
         if (existing.has(key) || newSkills[key]) continue;
-        newSkills[key] = {
-          owner: repo.owner.login.toLowerCase(),
-          name: repo.name.toLowerCase(),
-          display_name: `${repo.owner.login}/${repo.name}`,
-          description: repo.description || "No description",
-          url: repo.html_url,
-          github_repo: repo.full_name,
-          category: "Discovered",
-          source: "discover:topic",
-          stars: repo.stargazers_count,
-        };
+        if (!(await repoMatchesDiscoverFilter(repo))) continue;
+        newSkills[key] = discoveredSkillFromRepo(repo, "discover:topic");
       }
     } catch (e) {
       logErr(`  Skipped "${q}": ${e.message}`);
@@ -910,17 +1143,7 @@ async function cmdDiscover(args) {
         const repo = item.repository;
         const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
         if (existing.has(key) || newSkills[key]) continue;
-        newSkills[key] = {
-          owner: repo.owner.login.toLowerCase(),
-          name: repo.name.toLowerCase(),
-          display_name: `${repo.owner.login}/${repo.name}`,
-          description: repo.description || "No description",
-          url: repo.html_url,
-          github_repo: repo.full_name,
-          category: "Discovered",
-          source: "discover:code",
-          stars: repo.stargazers_count,
-        };
+        newSkills[key] = discoveredSkillFromRepo(repo, "discover:code");
       }
     } catch (e) {
       logErr(`  Skipped "${q}": ${e.message}`);
@@ -945,23 +1168,8 @@ async function cmdDiscover(args) {
       for (const repo of repos) {
         const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
         if (existing.has(key) || newSkills[key]) continue;
-        // Filter: must have SKILL.md in repo or description mentions skill/agent
-        const hasSkillKeyword =
-          (repo.description || "").toLowerCase().includes("skill") ||
-          (repo.description || "").toLowerCase().includes("agent") ||
-          (repo.topics || []).some((t) => t.includes("skill") || t.includes("agent"));
-        if (!hasSkillKeyword) continue;
-        newSkills[key] = {
-          owner: repo.owner.login.toLowerCase(),
-          name: repo.name.toLowerCase(),
-          display_name: `${repo.owner.login}/${repo.name}`,
-          description: repo.description || "No description",
-          url: repo.html_url,
-          github_repo: repo.full_name,
-          category: "Discovered",
-          source: "discover:keyword",
-          stars: repo.stargazers_count,
-        };
+        if (!(await repoMatchesDiscoverFilter(repo))) continue;
+        newSkills[key] = discoveredSkillFromRepo(repo, "discover:keyword");
       }
     } catch (e) {
       logErr(`  Skipped "${q}": ${e.message}`);
@@ -1034,7 +1242,7 @@ function cmdRemove(key) {
     return;
   }
   const normalizedKey = key.toLowerCase();
-  const manual = readManualSkills();
+  const manual = readManualSkills({ includeUnverifiedDiscoveries: true });
   if (!manual[normalizedKey]) {
     log(`"${normalizedKey}" is not a manually added skill.`);
     return;
@@ -1074,6 +1282,9 @@ Commands:
   add <owner> <name> <desc> <url>  Manually add a skill (persists across fetches)
   remove <owner/name>      Remove a manually added skill
   discover                 Search GitHub for new skills via topics, code, and keywords
+  agents discover          Build a separate AI agent/tool index
+  agents search <query>    Search the separate AI agent/tool index
+  agents top [N]           Rank AI agent/tool repos by GitHub stars
   update                   Re-fetch all skills and refresh cache
   combos [query]           Search built-in recommended skill/tool combos
   combos show <combo-id>   Show install steps and workflow for a combo
@@ -1093,6 +1304,9 @@ Examples:
   skills-book.mjs info "stripe/reasoning"
   skills-book.mjs install "stripe/reasoning"
   skills-book.mjs uninstall "reasoning"
+  skills-book.mjs agents discover
+  skills-book.mjs agents top 20
+  skills-book.mjs agents search "OpenCLI"
   skills-book.mjs combos
   skills-book.mjs recommend security
   skills-book.mjs combos show coding-research-docs-ui
@@ -1142,6 +1356,10 @@ async function main() {
       break;
     case "discover":
       await cmdDiscover(args.slice(1));
+      break;
+    case "agents":
+    case "agent":
+      await cmdAgents(args.slice(1));
       break;
     case "update":
       await cmdUpdate();
