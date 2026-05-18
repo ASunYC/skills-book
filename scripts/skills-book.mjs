@@ -6,6 +6,7 @@ import { join, dirname, basename } from "path";
 import { homedir } from "os";
 import { execSync } from "child_process";
 import { cmdCombos, printComboHighlights } from "./combo-skills.mjs";
+import { DISCOVERY_VERIFICATION, filterDiscoveredSkills, repoHasMetadataSkillSignal } from "./discovery-filter.mjs";
 import { cmdBuildWiki, cmdShopExport, cmdWikiGraph, cmdWikiQuery } from "./wiki-commands.mjs";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -62,23 +63,12 @@ function writeCache(data) {
   writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
-function isUnverifiedDiscoveredSkill(skill) {
-  const source = String(skill?.source || "");
-  return source.startsWith("discover:") && skill?.discovery_verified !== "root-skill-entry";
-}
-
-function filterUnverifiedDiscoveredSkills(skills) {
-  return Object.fromEntries(
-    Object.entries(skills || {}).filter(([, skill]) => !isUnverifiedDiscoveredSkill(skill)),
-  );
-}
-
 function readManualSkills(options = {}) {
   if (!existsSync(MANUAL_SKILLS_FILE)) return {};
   try {
     const skills = JSON.parse(readFileSync(MANUAL_SKILLS_FILE, "utf8"));
     if (options.includeUnverifiedDiscoveries) return skills;
-    return filterUnverifiedDiscoveredSkills(skills);
+    return filterDiscoveredSkills(skills);
   } catch {
     return {};
   }
@@ -583,7 +573,7 @@ function ensureCache() {
     log("No cache found. Running fetch first...");
     return null;
   }
-  cache.skills = filterUnverifiedDiscoveredSkills(cache.skills);
+  cache.skills = filterDiscoveredSkills(cache.skills);
   // Merge manual skills into cache for queries
   const manual = readManualSkills();
   for (const [key, skill] of Object.entries(manual)) {
@@ -877,19 +867,7 @@ async function searchGitHubCode(query, perPage = 100) {
 }
 
 function repoHasDiscoverCandidateSignal(repo) {
-  const description = String(repo.description || "").toLowerCase();
-  const name = String(repo.name || "").toLowerCase();
-  const fullName = String(repo.full_name || "").toLowerCase();
-  const topics = (repo.topics || []).map((topic) => String(topic || "").toLowerCase());
-
-  return (
-    description.includes("skill") ||
-    topics.some((topic) => topic.includes("skill")) ||
-    description.includes("agent.md") ||
-    name.includes("opencli") ||
-    description.includes("opencli") ||
-    fullName.includes("opencli")
-  );
+  return repoHasMetadataSkillSignal(repo);
 }
 
 async function githubRootHasSkillEntry(repo) {
@@ -921,11 +899,12 @@ async function githubRootHasSkillEntry(repo) {
 }
 
 async function repoMatchesDiscoverFilter(repo) {
-  if (!repoHasDiscoverCandidateSignal(repo)) return false;
-  return githubRootHasSkillEntry(repo);
+  if (repoHasDiscoverCandidateSignal(repo)) return DISCOVERY_VERIFICATION.metadataSkillSignal;
+  if (await githubRootHasSkillEntry(repo)) return DISCOVERY_VERIFICATION.rootSkillEntry;
+  return "";
 }
 
-function discoveredSkillFromRepo(repo, source) {
+function discoveredSkillFromRepo(repo, source, discoveryVerified = DISCOVERY_VERIFICATION.metadataSkillSignal) {
   return {
     owner: repo.owner.login.toLowerCase(),
     name: repo.name.toLowerCase(),
@@ -935,7 +914,7 @@ function discoveredSkillFromRepo(repo, source) {
     github_repo: repo.full_name,
     category: "Discovered",
     source,
-    discovery_verified: "root-skill-entry",
+    discovery_verified: discoveryVerified,
     stars: repo.stargazers_count,
   };
 }
@@ -1118,8 +1097,9 @@ async function cmdDiscover(args) {
       for (const repo of repos) {
         const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
         if (existing.has(key) || newSkills[key]) continue;
-        if (!(await repoMatchesDiscoverFilter(repo))) continue;
-        newSkills[key] = discoveredSkillFromRepo(repo, "discover:topic");
+        const discoveryVerified = await repoMatchesDiscoverFilter(repo);
+        if (!discoveryVerified) continue;
+        newSkills[key] = discoveredSkillFromRepo(repo, "discover:topic", discoveryVerified);
       }
     } catch (e) {
       logErr(`  Skipped "${q}": ${e.message}`);
@@ -1143,7 +1123,7 @@ async function cmdDiscover(args) {
         const repo = item.repository;
         const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
         if (existing.has(key) || newSkills[key]) continue;
-        newSkills[key] = discoveredSkillFromRepo(repo, "discover:code");
+        newSkills[key] = discoveredSkillFromRepo(repo, "discover:code", DISCOVERY_VERIFICATION.codeSearchSkillEntry);
       }
     } catch (e) {
       logErr(`  Skipped "${q}": ${e.message}`);
@@ -1168,8 +1148,9 @@ async function cmdDiscover(args) {
       for (const repo of repos) {
         const key = `${repo.owner.login}/${repo.name}`.toLowerCase();
         if (existing.has(key) || newSkills[key]) continue;
-        if (!(await repoMatchesDiscoverFilter(repo))) continue;
-        newSkills[key] = discoveredSkillFromRepo(repo, "discover:keyword");
+        const discoveryVerified = await repoMatchesDiscoverFilter(repo);
+        if (!discoveryVerified) continue;
+        newSkills[key] = discoveredSkillFromRepo(repo, "discover:keyword", discoveryVerified);
       }
     } catch (e) {
       logErr(`  Skipped "${q}": ${e.message}`);

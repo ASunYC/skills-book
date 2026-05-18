@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import crypto from "node:crypto";
 import { comboAsSkill, comboExportPayload, loadCombos, writeComboDocs } from "./combo-skills.mjs";
+import { filterDiscoveredSkills } from "./discovery-filter.mjs";
 
 const CACHE_DIR = join(homedir(), ".claude", "skills-book", "cache");
 const CACHE_FILE = join(CACHE_DIR, "skills-index.json");
@@ -550,7 +551,7 @@ export async function cmdBuildWiki(args = []) {
   const extract = hasFlag(args, "--extract");
   const llmWikiDir = resolveLlmWikiSkill();
   const docsRoot = resetDocsDir();
-  const skills = Object.values(cache.skills)
+  const skills = Object.values(filterDiscoveredSkills(cache.skills))
     .sort((a, b) => (b.stars || 0) - (a.stars || 0))
     .slice(0, limit > 0 ? limit : undefined);
 
