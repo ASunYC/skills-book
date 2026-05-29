@@ -542,6 +542,80 @@ LIMIT ?
   };
 }
 
+function resetSkillsWikiTables(db) {
+  const tableNames = [
+    "relations",
+    "chunks",
+    "pages",
+    "sources",
+    "entities",
+    "topics",
+    "skills",
+    "repositories",
+    "authors",
+    "locations",
+  ];
+  for (const table of tableNames) {
+    try {
+      const hasTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+      if (hasTable) db.prepare(`DELETE FROM ${table}`).run();
+    } catch {}
+  }
+}
+
+function hotScore(skill) {
+  const stars = Number(skill.stars || 0);
+  const updatedAt = Date.parse(skill.updatedAt || "");
+  const days = Number.isFinite(updatedAt) ? Math.max(0, (Date.now() - updatedAt) / (24 * 60 * 60 * 1000)) : 365;
+  const freshness = Math.max(0, 30 - days) * 4;
+  return Math.round(stars + freshness);
+}
+
+function skillsHotPayload(skills) {
+  const ranked = skills
+    .filter((skill) => Number(skill.stars || 0) > 0 && skill.githubRepo)
+    .map((skill) => ({
+      slug: skill.slug,
+      displayName: skill.displayName,
+      description: skill.description,
+      category: skill.category || "Uncategorized",
+      source: skill.source || "skills-book",
+      stars: Number(skill.stars || 0),
+      hotScore: hotScore(skill),
+      githubRepo: skill.githubRepo,
+      url: skill.url || (skill.githubRepo ? `https://github.com/${skill.githubRepo}` : ""),
+      updatedAt: skill.updatedAt,
+      author: skill.author,
+      href: `/skills-shop/${skill.slug}/`,
+    }))
+    .sort((a, b) => {
+      const scoreDelta = b.hotScore - a.hotScore;
+      if (scoreDelta !== 0) return scoreDelta;
+      return b.stars - a.stars;
+    })
+    .map((skill, index) => ({ rank: index + 1, ...skill }));
+  const categories = Object.entries(Object.groupBy(ranked, (skill) => skill.category || "Uncategorized"))
+    .map(([name, items]) => ({
+      name,
+      count: items.length,
+      topStars: items[0]?.stars || 0,
+      topSkill: items[0]?.displayName || "",
+    }))
+    .sort((a, b) => b.count - a.count);
+  return {
+    generatedAt: new Date().toISOString(),
+    source: "skills-book skills.db",
+    rankingModel: {
+      primary: "GitHub stars",
+      tieBreakers: ["recent repository activity", "current star count"],
+      note: "Skills Book imports EverythingSkill's public canonical list, persona distill sources, and its own broader agent-skill indexes.",
+    },
+    totalSkills: ranked.length,
+    categories,
+    skills: ranked,
+  };
+}
+
 export async function cmdBuildWiki(args = []) {
   const cache = readCache();
   if (!cache?.skills) throw new Error("No skills cache found. Run `node scripts/skills-book.mjs fetch --force` first.");
@@ -557,6 +631,9 @@ export async function cmdBuildWiki(args = []) {
 
   log(`Building Skills Wiki through llm-wiki-build-skill: ${skills.length} skills -> ${dbPath}`);
   runLlmWiki(llmWikiDir, ["init", dbPath, "--name", "Skills Book Wiki", "--description", "SQLite LLM Wiki built from public agent skills."]);
+  const resetDb = await openDb(dbPath);
+  resetSkillsWikiTables(resetDb);
+  resetDb.close();
 
   const records = [];
   const comboDocs = writeComboDocs(docsRoot);
@@ -595,8 +672,9 @@ ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name, description=ex
     const repoName = skill.github_repo?.split("/")[1] || skill.name || slug;
     const locationId = writeAuthor(db, author);
     const now = new Date().toISOString();
+    const sourceUpdatedAt = skill.updated_at || skill.repo_meta?.pushed_at || skill.repo_meta?.updated_at || now;
     if (skill.github_repo) {
-      insertRepo.run(skill.github_repo, owner, repoName, `https://github.com/${skill.github_repo}`, skill.stars || 0, docs.readme, docs.skillMd, now);
+      insertRepo.run(skill.github_repo, owner, repoName, `https://github.com/${skill.github_repo}`, skill.stars || 0, docs.readme, docs.skillMd, sourceUpdatedAt);
     }
     insertSkill.run(
       skillId,
@@ -615,8 +693,8 @@ ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name, description=ex
       locationId,
       docs.readme,
       docs.skillMd,
-      now,
-      now,
+      skill.added_at || now,
+      sourceUpdatedAt,
     );
   }
   writeAuthor(db, comboAuthor);
@@ -770,6 +848,10 @@ ORDER BY s.stars DESC
   mkdirSync(dataRoot, { recursive: true });
   writeFileSync(join(dataRoot, "skills-shop-map.json"), JSON.stringify(mapPayload, null, 2), "utf8");
   writeFileSync(join(dataRoot, "skills-shop", "graph.json"), JSON.stringify(graphFromSkillsDb(db, { maxEdges: graphEdgeLimit }), null, 2), "utf8");
+  mkdirSync(join(dataRoot, "skills-book"), { recursive: true });
+  const hotPayload = skillsHotPayload(skills);
+  writeFileSync(join(dataRoot, "skills-hot.json"), JSON.stringify(hotPayload, null, 2), "utf8");
+  writeFileSync(join(dataRoot, "skills-book", "hot.json"), JSON.stringify(hotPayload, null, 2), "utf8");
   const combosPayload = comboExportPayload();
   writeFileSync(join(dataRoot, "skills-shop-combos.json"), JSON.stringify(combosPayload, null, 2), "utf8");
   writeFileSync(join(dataRoot, "skills-shop", "combos.json"), JSON.stringify(combosPayload, null, 2), "utf8");

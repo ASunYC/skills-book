@@ -23,6 +23,7 @@ It helps you:
 - Browse skills by normalized category
 - Search skills by name, description, category, and keyword
 - Rank popular skills by GitHub stars
+- Track hot skills with GitHub stars plus repository freshness
 - Install skills into an Agent skill directory
 - Uninstall installed skills safely
 - Discover new skill repositories from GitHub
@@ -33,6 +34,7 @@ It helps you:
 
 - Homepage: https://asunyc.github.io/
 - Skills Book page: https://asunyc.github.io/skills-book/
+- Skills Hot page: https://asunyc.github.io/skills-hot/
 - Skills Shop page: https://asunyc.github.io/skills-shop/
 
 ## Design Goals
@@ -55,6 +57,7 @@ Skills Book provides one command entry for Claude Code, Codex, and OpenCode. The
 /skills-book categories
 /skills-book search "testing"
 /skills-book top 20
+/skills-book hot 50
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
 /skills-book uninstall "reasoning"
@@ -134,10 +137,12 @@ uipro init --ai codex
 ### Core Capabilities
 
 - **Multi-source aggregation**: pulls skills from curated public repositories
+- **EverythingSkill-compatible coverage**: imports the public EverythingSkill canonical dataset and the persona distillation awesome list, then deduplicates them with broader Skills Book sources
 - **GitHub discovery**: searches topics, `SKILL.md` files, and keywords to find new skill repositories
 - **Deduplication**: merges duplicate entries by `owner/repo`
 - **Category normalization**: unifies similar category names from different sources
 - **Stars ranking**: sorts skills by GitHub popularity
+- **Hot ranking**: combines GitHub stars with repository freshness metadata for the `Skills Hot` website page
 - **One-command install**: clones skills into the Agent skill directory
 - **Safe uninstall**: removes installed skills by name
 - **Persistent cache**: preserves manually added skills across refreshes
@@ -266,6 +271,7 @@ node scripts/skills-book.mjs agents search "OpenCLI"
 | `list` | `skills-book.mjs list "Python"` | Show skills in a category |
 | `search` | `skills-book.mjs search "testing"` | Search skills by keyword |
 | `top` | `skills-book.mjs top 10` | Rank skills by GitHub stars |
+| `hot` | `skills-book.mjs hot 50` | Rank hot skills by stars plus repo freshness |
 | `info` | `skills-book.mjs info "owner/name"` | Show skill details |
 | `install` | `skills-book.mjs install "owner/name"` | Install a skill |
 | `uninstall` | `skills-book.mjs uninstall "name"` | Uninstall a skill |
@@ -286,7 +292,7 @@ node scripts/skills-book.mjs agents search "OpenCLI"
 | `build-wiki` | `skills-book.mjs build-wiki --db ./skills.db` | Build the SQLite Skills Wiki |
 | `wiki-query` | `skills-book.mjs wiki-query "frontend design"` | Query the Skills Wiki |
 | `wiki-graph` | `skills-book.mjs wiki-graph --out graph.json` | Export wiki graph JSON |
-| `shop-export` | `skills-book.mjs shop-export ../site/data` | Export static website data |
+| `shop-export` | `skills-book.mjs shop-export ../site/data` | Export Skills Shop, Skills Hot, graph, and combo website data |
 
 ## Project Structure
 

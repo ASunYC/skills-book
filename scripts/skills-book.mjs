@@ -31,6 +31,16 @@ const SOURCES = {
     repo: "heilcheng/awesome-agent-skills",
     raw_url: "https://raw.githubusercontent.com/heilcheng/awesome-agent-skills/main/README.md",
   },
+  everythingskill: {
+    key: "everythingskill",
+    repo: "iwanderleo/everythingskill.net",
+    raw_url: "https://raw.githubusercontent.com/iwanderleo/everythingskill.net/main/app/data/skills.json",
+  },
+  personaDistill: {
+    key: "persona-distill",
+    repo: "xixu-me/awesome-persona-distill-skills",
+    raw_url: "https://raw.githubusercontent.com/xixu-me/awesome-persona-distill-skills/main/README.md",
+  },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -174,6 +184,34 @@ function extractOwnerNameFromUrl(url) {
   const m = url.match(/github\.com\/([^/]+)\/([^/]+)/);
   if (!m) return null;
   return { owner: m[1], name: m[2] };
+}
+
+function repoKeyFromRepo(repo) {
+  const parts = String(repo || "").split("/");
+  if (parts.length < 2) return null;
+  return `${parts[0].toLowerCase()}/${parts[1].toLowerCase()}`;
+}
+
+function skillKey(skill) {
+  return repoKeyFromRepo(skill.github_repo) || `${String(skill.owner || "unknown").toLowerCase()}/${String(skill.name || skill.display_name || "unknown").toLowerCase()}`;
+}
+
+function mergeSkill(allSkills, skill) {
+  const key = skillKey(skill);
+  const existing = allSkills[key];
+  if (!existing) {
+    allSkills[key] = skill;
+    return true;
+  }
+  existing.sources = [...new Set([...(existing.sources || [existing.source].filter(Boolean)), skill.source].filter(Boolean))];
+  if ((!existing.description || existing.description.length < 16) && skill.description) existing.description = skill.description;
+  if ((!existing.category || existing.category === "Unknown") && skill.category) existing.category = skill.category;
+  if (!existing.github_repo && skill.github_repo) existing.github_repo = skill.github_repo;
+  if (!existing.url && skill.url) existing.url = skill.url;
+  if (!existing.added_at && skill.added_at) existing.added_at = skill.added_at;
+  if (!existing.updated_at && skill.updated_at) existing.updated_at = skill.updated_at;
+  if (!existing.readme_locales && skill.readme_locales) existing.readme_locales = skill.readme_locales;
+  return false;
 }
 
 function findSkillMd(dir) {
@@ -403,6 +441,69 @@ function parseHeilchengReadme(markdown) {
   return skills;
 }
 
+function parseEverythingskillDataset(jsonText) {
+  const data = JSON.parse(jsonText);
+  const categoryLabels = new Map((data.categories || []).map((category) => [category.key, category.label || category.key]));
+  const skills = [];
+  for (const item of data.skills || []) {
+    const repo = extractRepoFromUrl(item.github || "");
+    if (!repo) continue;
+    const [owner, repoName] = repo.split("/");
+    const categoryLabel = categoryLabels.get(item.category) || item.category || "Uncategorized";
+    skills.push({
+      owner: owner.toLowerCase(),
+      name: String(item.slug || repoName || item.name || "skill").toLowerCase(),
+      display_name: repo,
+      description: item.summary || item.description || item.summaryZh || item.descriptionZh || "",
+      url: item.github,
+      github_repo: repo,
+      category: `EverythingSkill / ${categoryLabel}`,
+      source: "everythingskill",
+      stars: item.stars,
+      added_at: item.addedAt,
+      updated_at: item.updatedAt || data.lastSyncedAt,
+      readme_locales: item.readmeLocales || [],
+      github_status: item.githubStatus || null,
+      tags: item.tags || [],
+    });
+  }
+  return skills;
+}
+
+function parsePersonaDistillReadme(markdown) {
+  const skills = [];
+  const seen = new Set();
+  const lines = markdown.split("\n");
+  const repoRegex = /github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:\.git)?/g;
+  for (const rawLine of lines) {
+    let match;
+    while ((match = repoRegex.exec(rawLine)) !== null) {
+      const repo = match[1].replace(/\/$/, "");
+      if (repo === SOURCES.personaDistill.repo || seen.has(repo.toLowerCase())) continue;
+      seen.add(repo.toLowerCase());
+      const [owner, repoName] = repo.split("/");
+      const cleanLine = rawLine
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\[[^\]]+\]\([^)]+\)/g, " ")
+        .replace(/https?:\/\/\S+/g, " ")
+        .replace(/[`*_>#|-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      skills.push({
+        owner: owner.toLowerCase(),
+        name: repoName.toLowerCase(),
+        display_name: repo,
+        description: cleanLine || `Persona-distilled skill repository from ${repo}.`,
+        url: `https://github.com/${repo}`,
+        github_repo: repo,
+        category: "Persona Distill Skills",
+        source: "persona-distill",
+      });
+    }
+  }
+  return skills;
+}
+
 // ─── Fetch & Merge ───────────────────────────────────────────────────────────
 
 async function fetchSource(source) {
@@ -420,7 +521,7 @@ async function fetchStars(repos) {
 
   for (const repo of repos) {
     const entry = starCache[repo];
-    if (!entry || now - entry.fetched_at > STARS_TTL) {
+    if (!entry || now - entry.fetched_at > STARS_TTL || entry.forks == null || entry.pushed_at == null) {
       uncached.push(repo);
     }
   }
@@ -442,21 +543,33 @@ async function fetchStars(repos) {
           const remaining = parseInt(res.headers.get("x-ratelimit-remaining") || "0", 10);
           if (remaining <= 5) rateLimited = true;
           const data = await res.json();
-          return { repo, stars: data.stargazers_count || 0 };
+          return {
+            repo,
+            stars: data.stargazers_count || 0,
+            forks: data.forks_count || 0,
+            watchers: data.subscribers_count || 0,
+            open_issues: data.open_issues_count || 0,
+            default_branch: data.default_branch || "",
+            pushed_at: data.pushed_at || "",
+            updated_at: data.updated_at || "",
+            archived: Boolean(data.archived),
+            disabled: Boolean(data.disabled),
+            html_url: data.html_url || `https://github.com/${repo}`,
+            fetched_at: now,
+          };
         })
       );
 
       for (let j = 0; j < results.length; j++) {
         const result = results[j];
         if (result.status === "fulfilled") {
-          starCache[result.value.repo] = {
-            stars: result.value.stars,
-            fetched_at: now,
-          };
+          starCache[result.value.repo] = result.value;
           successCount++;
         } else if (batch[j]) {
-          // On failure, set 0 stars so we don't retry forever
-          starCache[batch[j]] = { stars: 0, fetched_at: now };
+          const existing = starCache[batch[j]];
+          starCache[batch[j]] = existing
+            ? { ...existing, fetched_at: now, fetch_error: result.reason?.message || "fetch_failed" }
+            : { stars: null, fetched_at: now, fetch_error: result.reason?.message || "fetch_failed" };
         }
       }
 
@@ -496,8 +609,7 @@ async function cmdFetch(args) {
     const markdown = await fetchSource(SOURCES.voltagent);
     const skills = parseVoltagentReadme(markdown);
     for (const skill of skills) {
-      const key = `${skill.owner}/${skill.name}`;
-      allSkills[key] = skill;
+      mergeSkill(allSkills, skill);
     }
     sources.voltagent = {
       repo: SOURCES.voltagent.repo,
@@ -515,11 +627,7 @@ async function cmdFetch(args) {
     const skills = parseHeilchengReadme(markdown);
     let added = 0;
     for (const skill of skills) {
-      const key = `${skill.owner}/${skill.name}`;
-      if (!allSkills[key]) {
-        allSkills[key] = skill;
-        added++;
-      }
+      if (mergeSkill(allSkills, skill)) added++;
     }
     sources.heilcheng = {
       repo: SOURCES.heilcheng.repo,
@@ -530,6 +638,44 @@ async function cmdFetch(args) {
     log(`  Parsed ${skills.length} skills from heilcheng (${added} new)`);
   } catch (e) {
     logErr(`  Failed to fetch heilcheng: ${e.message}`);
+  }
+
+  // Parse EverythingSkill.net canonical dataset (active public skills, daily synced upstream)
+  try {
+    const jsonText = await fetchSource(SOURCES.everythingskill);
+    const skills = parseEverythingskillDataset(jsonText);
+    let added = 0;
+    for (const skill of skills) {
+      if (mergeSkill(allSkills, skill)) added++;
+    }
+    sources.everythingskill = {
+      repo: SOURCES.everythingskill.repo,
+      fetched_at: new Date().toISOString(),
+      skill_count: skills.length,
+      added_count: added,
+    };
+    log(`  Parsed ${skills.length} skills from EverythingSkill (${added} new)`);
+  } catch (e) {
+    logErr(`  Failed to fetch EverythingSkill: ${e.message}`);
+  }
+
+  // Parse the persona distillation awesome list tracked by EverythingSkill.
+  try {
+    const markdown = await fetchSource(SOURCES.personaDistill);
+    const skills = parsePersonaDistillReadme(markdown);
+    let added = 0;
+    for (const skill of skills) {
+      if (mergeSkill(allSkills, skill)) added++;
+    }
+    sources.personaDistill = {
+      repo: SOURCES.personaDistill.repo,
+      fetched_at: new Date().toISOString(),
+      skill_count: skills.length,
+      added_count: added,
+    };
+    log(`  Parsed ${skills.length} skills from persona distill list (${added} new)`);
+  } catch (e) {
+    logErr(`  Failed to fetch persona distill list: ${e.message}`);
   }
 
   // Fetch stars for all unique repos
@@ -543,7 +689,20 @@ async function cmdFetch(args) {
   // Apply star counts
   for (const skill of Object.values(allSkills)) {
     if (skill.github_repo && starCache[skill.github_repo]) {
-      skill.stars = starCache[skill.github_repo].stars;
+      const repoMeta = starCache[skill.github_repo];
+      if (repoMeta.stars != null) skill.stars = repoMeta.stars;
+      skill.repo_meta = {
+        forks: repoMeta.forks || 0,
+        watchers: repoMeta.watchers || 0,
+        open_issues: repoMeta.open_issues || 0,
+        pushed_at: repoMeta.pushed_at || "",
+        updated_at: repoMeta.updated_at || "",
+        archived: Boolean(repoMeta.archived),
+        disabled: Boolean(repoMeta.disabled),
+        fetched_at: repoMeta.fetched_at ? new Date(repoMeta.fetched_at).toISOString() : new Date().toISOString(),
+        fetch_error: repoMeta.fetch_error || null,
+      };
+      if (!skill.updated_at && repoMeta.pushed_at) skill.updated_at = repoMeta.pushed_at;
     }
   }
 
@@ -705,6 +864,50 @@ function cmdTop(n = 20) {
     const [, skill] = withStars[i];
     log(`  ${(i + 1).toString().padStart(2)}  ${skill.display_name.padEnd(42)} ★${skill.stars.toLocaleString().padStart(6)}  ${skill.category}`);
   }
+  log("");
+}
+
+function daysSince(value) {
+  if (!value) return 365;
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return 365;
+  return Math.max(0, (Date.now() - time) / (24 * 60 * 60 * 1000));
+}
+
+function hotScore(skill) {
+  const stars = Number(skill.stars || 0);
+  const forks = Number(skill.repo_meta?.forks || 0);
+  const recencyBoost = Math.max(0, 30 - daysSince(skill.repo_meta?.pushed_at || skill.updated_at)) * 4;
+  const archivedPenalty = skill.repo_meta?.archived || skill.github_status === 404 ? 0.5 : 1;
+  return Math.round((stars + forks * 2 + recencyBoost) * archivedPenalty);
+}
+
+function cmdHot(n = 50) {
+  const cache = ensureCache();
+  if (!cache) return;
+
+  const ranked = Object.entries(cache.skills)
+    .filter(([, s]) => Number(s.stars || 0) > 0 && s.github_status !== 404 && !s.repo_meta?.disabled)
+    .map(([key, skill]) => [key, { ...skill, hot_score: hotScore(skill) }])
+    .sort((a, b) => {
+      const scoreDelta = b[1].hot_score - a[1].hot_score;
+      if (scoreDelta !== 0) return scoreDelta;
+      return Number(b[1].stars || 0) - Number(a[1].stars || 0);
+    })
+    .slice(0, n);
+
+  if (!ranked.length) {
+    log("No hot ranking data available. Run 'skills-book.mjs fetch --force' first.");
+    return;
+  }
+
+  log(`\nHot ${ranked.length} Skills (stars + repo freshness):\n`);
+  log(`  #   ${"Skill".padEnd(42)} ${"Hot".padStart(8)} ${"Stars".padStart(8)}  Updated`);
+  log(`  ${"-".repeat(86)}`);
+  ranked.forEach(([, skill], index) => {
+    const updated = (skill.repo_meta?.pushed_at || skill.updated_at || "").slice(0, 10) || "-";
+    log(`  ${String(index + 1).padStart(2)}  ${String(skill.display_name).padEnd(42)} ${String(skill.hot_score).padStart(8)} ${String(skill.stars || 0).padStart(8)}  ${updated}`);
+  });
   log("");
 }
 
@@ -1257,6 +1460,7 @@ Commands:
   list <category>          Show skills in a category
   search <query>           Search skills by name, description, or category
   top [N]                  Top N skills by GitHub stars (default: 20)
+  hot [N]                  Hot skills by stars plus repository freshness
   info <owner/name>        Detailed info for a skill
   install <owner/name>     Install a skill to ~/.claude/skills/
   uninstall <name>         Remove a skill from ~/.claude/skills/
@@ -1282,6 +1486,7 @@ Examples:
   skills-book.mjs list "Python Skills"
   skills-book.mjs search "testing"
   skills-book.mjs top 10
+  skills-book.mjs hot 50
   skills-book.mjs info "stripe/reasoning"
   skills-book.mjs install "stripe/reasoning"
   skills-book.mjs uninstall "reasoning"
@@ -1319,6 +1524,9 @@ async function main() {
       break;
     case "top":
       cmdTop(parseInt(args[1]) || 20);
+      break;
+    case "hot":
+      cmdHot(parseInt(args[1]) || 50);
       break;
     case "info":
       cmdInfo(args[1]);

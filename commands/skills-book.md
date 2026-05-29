@@ -30,6 +30,7 @@ node <skill-root>/scripts/skills.mjs $ARGUMENTS
 /skills-book categories
 /skills-book search "testing"
 /skills-book top 20
+/skills-book hot 50
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
 /skills-book agents discover

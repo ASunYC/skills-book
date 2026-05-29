@@ -17,6 +17,7 @@ When Skills Book is installed in Claude Code, Codex, or OpenCode, prefer the sla
 /skills-book categories
 /skills-book search "testing"
 /skills-book top 20
+/skills-book hot 50
 /skills-book info "stripe/reasoning"
 /skills-book install "stripe/reasoning"
 /skills-book agents discover
@@ -64,6 +65,7 @@ Use this skill when the user wants to:
 - Browse available agent skills by category
 - Search for a specific skill by name or description
 - Find the most popular skills by GitHub stars
+- Find hot skills by GitHub stars plus repository freshness
 - Search and rank AI agent/tool repositories in a separate agent index
 - View recommended skill/tool combos by category
 - Install or uninstall a skill
@@ -71,11 +73,13 @@ Use this skill when the user wants to:
 
 ## How It Works
 
-This skill aggregates skills from two sources:
-- **VoltAgent/awesome-agent-skills** (~935 skills) — curated, quality-gated
-- **heilcheng/awesome-agent-skills** (~240 skills) — Chinese community + global
+This skill aggregates skills from multiple sources:
+- **VoltAgent/awesome-agent-skills** — curated, quality-gated
+- **heilcheng/awesome-agent-skills** — Chinese community + global
+- **iwanderleo/everythingskill.net** — public canonical EverythingSkill dataset
+- **xixu-me/awesome-persona-distill-skills** — persona-distilled skill list tracked by EverythingSkill
 
-Skills are deduplicated by `owner/name`, categorized, and cached locally.
+Skills are deduplicated by `owner/repo`, categorized, and cached locally.
 
 ## Available Commands
 
@@ -126,7 +130,17 @@ node <this_dir>/scripts/skills-book.mjs top        # Top 20
 node <this_dir>/scripts/skills-book.mjs top 50     # Top 50
 ```
 
-### 6. Skill Details
+### 6. Hot Skills
+
+Show hot skills ranked by GitHub stars plus repository freshness:
+```
+node <this_dir>/scripts/skills-book.mjs hot        # Hot 50
+node <this_dir>/scripts/skills-book.mjs hot 100    # Hot 100
+```
+
+`shop-export` writes this ranking to `skills-hot.json` and `skills-book/hot.json` for the IO website.
+
+### 7. Skill Details
 
 Get detailed info for a specific skill:
 ```
@@ -134,7 +148,7 @@ node <this_dir>/scripts/skills-book.mjs info "stripe/reasoning"
 node <this_dir>/scripts/skills-book.mjs info "context-compression"
 ```
 
-### 7. Recommended Combos
+### 8. Recommended Combos
 
 Show built-in skill/tool combinations for common workflows:
 ```
@@ -146,7 +160,7 @@ node <this_dir>/scripts/skills-book.mjs combos show coding-research-docs-ui
 
 Combos are also written into `skills.db` during `build-wiki` and exported by `shop-export`.
 
-### 8. Agent Index
+### 9. Agent Index
 
 Build and query a separate AI agent/tool repository index. Agent results do not appear in normal skill search, categories, or top rankings:
 ```
@@ -155,7 +169,7 @@ node <this_dir>/scripts/skills-book.mjs agents top 20
 node <this_dir>/scripts/skills-book.mjs agents search "OpenCLI"
 ```
 
-### 9. Install a Skill
+### 10. Install a Skill
 
 Automatically clone a skill to `~/.claude/skills/`:
 ```
@@ -165,14 +179,14 @@ node <this_dir>/scripts/skills-book.mjs install "microsoft/devskim"
 
 The script finds the skill in the index, clones its GitHub repo, and copies the SKILL.md to the skills directory.
 
-### 10. Uninstall a Skill
+### 11. Uninstall a Skill
 
 Remove a skill from `~/.claude/skills/`:
 ```
 node <this_dir>/scripts/skills-book.mjs uninstall "reasoning"
 ```
 
-### 11. Update Index
+### 12. Update Index
 
 Force re-fetch all skills from GitHub:
 ```
@@ -193,6 +207,9 @@ node <this_dir>/scripts/skills-book.mjs search "testing"
 
 # See what's popular
 node <this_dir>/scripts/skills-book.mjs top 10
+
+# See what's hot now
+node <this_dir>/scripts/skills-book.mjs hot 20
 
 # See recommended combos
 node <this_dir>/scripts/skills-book.mjs combos

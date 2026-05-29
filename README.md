@@ -19,6 +19,7 @@ Skills Book is an agent skill marketplace for aggregating high-quality skills fr
 - Browse skill categories
 - Search skills by name, description, or category
 - View TOP rankings by GitHub stars
+- View hot rankings by stars and repository freshness
 - Install and uninstall skills with Agent commands
 - Build a local SQLite Skills Wiki for semantic lookup and graph export
 
@@ -53,6 +54,7 @@ Agent command examples:
 /skills-book categories
 /skills-book search "testing"
 /skills-book top 20
+/skills-book hot 50
 /skills-book install "stripe/reasoning"
 ```
 
@@ -60,5 +62,6 @@ Agent command examples:
 
 - Homepage: https://asunyc.github.io/
 - Skills Book: https://asunyc.github.io/skills-book/
+- Skills Hot: https://asunyc.github.io/skills-hot/
 - Skills Shop: https://asunyc.github.io/skills-shop/
 - Issues: https://github.com/ASunYC/skills-book/issues

@@ -22,6 +22,7 @@
   "scripts": {
     "cli": "node scripts/skills.mjs",
     "fetch": "node scripts/skills-book.mjs fetch",
+    "hot": "node scripts/skills-book.mjs hot",
     "build-wiki": "node scripts/skills-book.mjs build-wiki",
     "wiki-query": "node scripts/skills-book.mjs wiki-query",
     "shop-export": "node scripts/skills-book.mjs shop-export"

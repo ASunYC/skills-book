@@ -21,6 +21,7 @@ Examples:
 /skills-book fetch --force
 /skills-book search "testing"
 /skills-book top 10
+/skills-book hot 50
 /skills-book build-wiki
 /skills-book wiki-query "frontend design"
 ```
