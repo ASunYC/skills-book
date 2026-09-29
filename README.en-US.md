@@ -37,6 +37,16 @@ It helps you:
 - Skills Hot page: https://asunyc.github.io/skills-hot/
 - Skills Shop page: https://asunyc.github.io/skills-shop/
 
+These pages are maintained in the separate [ASunYC.github.io repository](https://github.com/ASunYC/ASunYC.github.io). The website supports browsing; install skills and refresh the index with the CLI in this repository.
+
+To regenerate the Skills Shop static export from the repository root:
+
+```bash
+node scripts/skills-book.mjs shop-export ../ASunYC.github.io/docs/public/data
+```
+
+Review the generated diff in the website repository before publishing it.
+
 ## Design Goals
 
 Skills Book is designed to be simple for Agents to call automatically:

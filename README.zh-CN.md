@@ -16,16 +16,13 @@
 
 ---
 
-## 🎬 效果演示
+## 🎬 在线体验
 
-<div align="center">
+- [Skills Book 使用介绍](https://asunyc.github.io/skills-book/)
+- [Skills Hot 热门榜单](https://asunyc.github.io/skills-hot/)
+- [Skills Shop 技能地图](https://asunyc.github.io/skills-shop/)
 
-<!-- 在这里放置效果演示视频 -->
-<!-- 替换为你自己的视频链接 -->
-
-*Skills Book 效果演示 - 从搜索到安装一键完成*
-
-</div>
+网页用于浏览和发现技能；安装与索引更新由本仓库的命令行工具完成。
 
 ---
 
@@ -44,6 +41,14 @@ Skills Book 是一个聚合多源 awesome-agent-skills 仓库的技能管理工�
 - 官网首页：https://asunyc.github.io/
 - Skills Book 页面：https://asunyc.github.io/skills-book/
 - Skills Shop 页面：https://asunyc.github.io/skills-shop/
+
+网站源码位于独立的 [ASunYC.github.io 仓库](https://github.com/ASunYC/ASunYC.github.io)。从本仓库导出 Skills Shop 静态数据时，在项目根目录运行：
+
+```bash
+node scripts/skills-book.mjs shop-export ../ASunYC.github.io/docs/public/data
+```
+
+发布前请在网站仓库检查生成的数据差异。
 
 ### 🎯 设计理念
 

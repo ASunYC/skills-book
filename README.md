@@ -22,6 +22,7 @@ Skills Book is an agent skill marketplace for aggregating high-quality skills fr
 - View hot rankings by stars and repository freshness
 - Install and uninstall skills with Agent commands
 - Build a local SQLite Skills Wiki for semantic lookup and graph export
+- Export static discovery data for the Skills Book, Skills Hot, and Skills Shop pages
 
 Read the full English documentation: [README.en-US.md](./README.en-US.md)
 
@@ -34,6 +35,7 @@ Skills Book 是一个面向 Agent 的技能宝典，用来聚合多个平台的�
 - 按 GitHub Stars 查看热门排行
 - 通过 Agent 命令安装和卸载技能
 - 构建本地 SQLite Skills Wiki，支持语义查询和图谱导出
+- 为 Skills Book、Skills Hot 和 Skills Shop 页面导出静态数据
 
 查看完整中文文档：[README.zh-CN.md](./README.zh-CN.md)
 
@@ -41,13 +43,18 @@ Skills Book 是一个面向 Agent 的技能宝典，用来聚合多个平台的�
 
 ## Quick Start
 
+Run the CLI directly from a checkout with Node.js 22 or newer. Browsing and search use a local index, so fetch it first:
+
 ```bash
 git clone https://github.com/ASunYC/skills-book.git
 cd skills-book
-node scripts/skills-book.mjs help
+node scripts/skills-book.mjs fetch --force
+node scripts/skills-book.mjs categories
+node scripts/skills-book.mjs search "testing"
+node scripts/skills-book.mjs hot 20
 ```
 
-Agent command examples:
+After installing this repository as an agent skill, the `/skills-book` wrapper provides the same commands in Claude Code, Codex, and OpenCode:
 
 ```bash
 /skills-book fetch --force
@@ -57,6 +64,18 @@ Agent command examples:
 /skills-book hot 50
 /skills-book install "stripe/reasoning"
 ```
+
+The core discovery CLI needs no `npm install`. The optional SQLite wiki workflow uses `llm-wiki-build-skill`; see the language-specific guides for setup and commands.
+
+## Website data
+
+The skill index is maintained here. The static website is maintained in [ASunYC.github.io](https://github.com/ASunYC/ASunYC.github.io). To regenerate its Skills Shop export from a local checkout:
+
+```bash
+node scripts/skills-book.mjs shop-export ../ASunYC.github.io/docs/public/data
+```
+
+This writes generated data for the site; review the resulting diff in the website repository before publishing it.
 
 ## Links
 
