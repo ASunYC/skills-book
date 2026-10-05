@@ -50,6 +50,8 @@ node scripts/skills-book.mjs shop-export ../ASunYC.github.io/docs/public/data
 
 发布前请在网站仓库检查生成的数据差异。
 
+网站仓库的 [数据刷新工作流](https://github.com/ASunYC/ASunYC.github.io/blob/master/.github/workflows/refresh-skills-data.yml) 会依次拉取索引、构建 Wiki、导出静态数据并生成 Skills Hot 榜单。本地执行 `shop-export` 只更新网站文件，不会自行发布页面。
+
 ### 🎯 设计理念
 
 **零依赖命令行**

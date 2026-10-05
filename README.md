@@ -67,6 +67,8 @@ After installing this repository as an agent skill, the `/skills-book` wrapper p
 
 The core discovery CLI needs no `npm install`. The optional SQLite wiki workflow uses `llm-wiki-build-skill`; see the language-specific guides for setup and commands.
 
+`fetch --force` downloads a fresh index; browsing commands then read the cache under `~/.claude/skills-book/cache/`. Set `GITHUB_TOKEN` when fetching large indexes to increase GitHub API limits. See the language-specific guides for cache behavior and configuration.
+
 ## Website data
 
 The skill index is maintained here. The static website is maintained in [ASunYC.github.io](https://github.com/ASunYC/ASunYC.github.io). To regenerate its Skills Shop export from a local checkout:
@@ -76,6 +78,8 @@ node scripts/skills-book.mjs shop-export ../ASunYC.github.io/docs/public/data
 ```
 
 This writes generated data for the site; review the resulting diff in the website repository before publishing it.
+
+The [site refresh workflow](https://github.com/ASunYC/ASunYC.github.io/blob/master/.github/workflows/refresh-skills-data.yml) runs the fetch, wiki build, export, and hot-list generation steps automatically. `shop-export` changes local site files; it does not publish the website by itself.
 
 ## Links
 

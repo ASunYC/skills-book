@@ -47,6 +47,8 @@ node scripts/skills-book.mjs shop-export ../ASunYC.github.io/docs/public/data
 
 Review the generated diff in the website repository before publishing it.
 
+The site's [data refresh workflow](https://github.com/ASunYC/ASunYC.github.io/blob/master/.github/workflows/refresh-skills-data.yml) fetches the index, builds the wiki, exports static files, and generates the Skills Hot list in that order. Running `shop-export` locally updates site files; it does not publish the website.
+
 ## Design Goals
 
 Skills Book is designed to be simple for Agents to call automatically:
